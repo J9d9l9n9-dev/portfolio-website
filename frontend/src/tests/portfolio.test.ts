@@ -1,5 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { FALLBACK_PROFILE, FALLBACK_PROJECTS, FALLBACK_SKILLS, fetchProjectBySlug } from '../api/client';
+import { FALLBACK_PROFILE, FALLBACK_PROJECTS, FALLBACK_SKILLS, fetchProjectBySlug, resolveAssetUrl, BACKEND_ORIGIN } from '../api/client';
+
+describe('Asset URL Normalization & Storage Resilience', () => {
+  it('resolves relative backend uploads to absolute backend origin', () => {
+    const url = '/uploads/b04805a21959.jpeg';
+    const resolved = resolveAssetUrl(url);
+    expect(resolved).toBe(`${BACKEND_ORIGIN}/uploads/b04805a21959.jpeg`);
+  });
+
+  it('preserves absolute URLs (Cloudinary / HTTPS)', () => {
+    const cloudinaryUrl = 'https://res.cloudinary.com/demo/image/upload/sample.jpg';
+    expect(resolveAssetUrl(cloudinaryUrl)).toBe(cloudinaryUrl);
+  });
+
+  it('preserves frontend local static assets', () => {
+    expect(resolveAssetUrl('/images/hero.jpg')).toBe('/images/hero.jpg');
+    expect(resolveAssetUrl('/resume.pdf')).toBe('/resume.pdf');
+  });
+
+  it('handles empty and null values gracefully', () => {
+    expect(resolveAssetUrl('')).toBe('');
+    expect(resolveAssetUrl(null)).toBe('');
+    expect(resolveAssetUrl(undefined)).toBe('');
+  });
+});
 
 describe('Portfolio Fallback Data Integrity', () => {
   it('loads valid profile fallback with required fields', () => {

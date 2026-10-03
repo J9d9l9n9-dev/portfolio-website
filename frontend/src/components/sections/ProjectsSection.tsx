@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FolderGit2, ExternalLink, ArrowRight, Layers, Sparkles } from 'lucide-react';
 import { GithubIcon } from '../ui/SocialIcons';
 import { Link } from 'react-router-dom';
+import { resolveAssetUrl } from '../../api/client';
 import type { Project } from '../../types';
 
 interface ProjectsSectionProps {
@@ -58,7 +59,7 @@ export const ProjectsSection: React.FC<ProjectsSectionProps> = ({ projects }) =>
         {/* Projects Bento Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredProjects.map((project) => {
-            const imgSrc = project.image || '/images/ai-skin-desktop.jpg';
+            const imgSrc = resolveAssetUrl(project.image) || '/images/ai-skin-desktop.jpg';
             return (
               <div
                 key={project.slug}

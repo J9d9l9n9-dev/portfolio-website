@@ -165,7 +165,7 @@ class S3StorageAdapter(BaseStorageAdapter):
 
 def get_storage_adapter() -> BaseStorageAdapter:
     upload_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
-    if settings.STORAGE_TYPE == "cloudinary" and settings.CLOUDINARY_URL:
+    if (settings.STORAGE_TYPE == "cloudinary" or bool(settings.CLOUDINARY_URL)) and settings.CLOUDINARY_URL:
         return CloudinaryStorageAdapter(settings.CLOUDINARY_URL)
     elif settings.STORAGE_TYPE == "s3" and settings.AWS_S3_BUCKET:
         return S3StorageAdapter(settings.AWS_S3_BUCKET, settings.AWS_REGION, settings.S3_ENDPOINT_URL)

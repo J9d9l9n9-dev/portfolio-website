@@ -153,3 +153,31 @@ def test_unauthenticated_media_access(client):
 
     res_post = client.post("/api/v1/upload", files={"file": ("test.png", b"123", "image/png")})
     assert res_post.status_code == 401
+
+def test_hero_image_update_and_persistence(client, auth_headers):
+    """Regression test: verify Hero image can be uploaded, saved in profile, persisted in DB, and read via GET /profile."""
+    # 1. Upload new Hero image
+    hero_bytes = generate_test_image("JPEG", (480, 600), "purple")
+    files = {"file": ("new_hero_portrait.jpg", hero_bytes, "image/jpeg")}
+    upload_res = client.post("/api/v1/upload", headers=auth_headers, files=files)
+    assert upload_res.status_code == 201
+    new_hero_url = upload_res.json()["url"]
+    assert new_hero_url.startswith("/uploads/") or "cloudinary" in new_hero_url or "http" in new_hero_url
+
+    # 2. Update Profile with new hero_image
+    update_res = client.put("/api/v1/profile", headers=auth_headers, json={
+        "hero_image": new_hero_url,
+        "hero_image_position": "center 30%"
+    })
+    assert update_res.status_code == 200
+    updated_profile = update_res.json()
+    assert updated_profile["hero_image"] == new_hero_url
+    assert updated_profile["hero_image_position"] == "center 30%"
+    assert updated_profile["name"] != ""  # Existing fields preserved
+
+    # 3. Read via public GET /profile
+    get_res = client.get("/api/v1/profile")
+    assert get_res.status_code == 200
+    public_profile = get_res.json()
+    assert public_profile["hero_image"] == new_hero_url
+    assert public_profile["hero_image_position"] == "center 30%"

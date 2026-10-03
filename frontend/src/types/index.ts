@@ -48,11 +48,13 @@ export interface Profile {
   secondary_cta_text?: string;
   secondary_cta_url?: string;
   avatar_image?: string;
+  avatarImage?: string;
   about_heading?: string;
   about_description?: string;
   about_paragraphs?: string[];
   about_highlights?: AboutHighlight[];
   about_image?: string;
+  aboutImage?: string;
 }
 
 export interface SiteSettings {

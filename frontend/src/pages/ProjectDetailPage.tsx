@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchProjectBySlug, fetchProjects } from '../api/client';
+import { fetchProjectBySlug, fetchProjects, resolveAssetUrl } from '../api/client';
 import {
   ArrowLeft,
   ExternalLink,
@@ -94,9 +94,9 @@ export const ProjectDetailPage: React.FC = () => {
   const nextProject = currentIndex >= 0 && currentIndex < allProjects.length - 1 ? allProjects[currentIndex + 1] : allProjects[0];
 
   // Screenshots gallery
-  const gallery = project.gallery && project.gallery.length > 0
+  const gallery = (project.gallery && project.gallery.length > 0
     ? project.gallery
-    : [project.image || '/images/ai-skin-desktop.jpg'];
+    : [project.image || '/images/ai-skin-desktop.jpg']).map((img) => resolveAssetUrl(img));
 
   return (
     <article className="py-28 px-4 sm:px-6 lg:px-8 max-w-content mx-auto min-h-screen">

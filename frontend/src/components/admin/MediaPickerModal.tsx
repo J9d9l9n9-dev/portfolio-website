@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchMediaAssets, uploadImage, deleteMediaAsset } from '../../api/client';
+import { fetchMediaAssets, uploadImage, deleteMediaAsset, resolveAssetUrl } from '../../api/client';
 import { useToast } from '../ui/Toast';
 import {
   X,
@@ -169,7 +169,7 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 max-h-[50vh] overflow-y-auto p-1">
                   {mediaList.map((asset) => {
                     const isSelected = selectedAsset?.id === asset.id;
-                    const displayUrl = asset.secure_url || asset.url;
+                    const displayUrl = resolveAssetUrl(asset.secure_url || asset.url);
                     return (
                       <div
                         key={asset.id}

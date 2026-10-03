@@ -35,6 +35,7 @@ import {
   uploadResume,
   exportBackupJson,
   getAdminToken,
+  resolveAssetUrl,
 } from '../api/client';
 import { MediaPickerModal } from '../components/admin/MediaPickerModal';
 import { useToast } from '../components/ui/Toast';
@@ -215,9 +216,10 @@ export const AdminDashboardPage: React.FC = () => {
     e.preventDefault();
     setSavingProfile(true);
     try {
-      await updateProfile(profileForm);
+      const updated = await updateProfile(profileForm);
+      setProfileForm(updated);
       showToast('Hero & Profile changes saved! Public site updated immediately.', 'success');
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      await queryClient.invalidateQueries({ queryKey: ['profile'] });
     } catch (err: any) {
       showToast(err.message || 'Failed to update profile', 'error');
     } finally {
@@ -639,6 +641,20 @@ export const AdminDashboardPage: React.FC = () => {
                         <span>Choose</span>
                       </button>
                     </div>
+                    {(profileForm.hero_image || profileForm.heroImage) && (
+                      <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-bg-card border border-border">
+                        <img
+                          src={resolveAssetUrl(profileForm.hero_image || profileForm.heroImage)}
+                          alt="Hero Preview"
+                          className="w-16 h-16 rounded-lg object-cover border border-border/60 bg-black/20"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-mono text-emerald-400 font-medium">Hero Image Active</p>
+                          <p className="text-xs text-text-muted truncate">{profileForm.hero_image || profileForm.heroImage}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -662,6 +678,20 @@ export const AdminDashboardPage: React.FC = () => {
                         <span>Choose</span>
                       </button>
                     </div>
+                    {profileForm.avatar_image && (
+                      <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-bg-card border border-border">
+                        <img
+                          src={resolveAssetUrl(profileForm.avatar_image)}
+                          alt="Avatar Preview"
+                          className="w-12 h-12 rounded-full object-cover border border-border/60 bg-black/20"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-mono text-secondary font-medium">Avatar Active</p>
+                          <p className="text-xs text-text-muted truncate">{profileForm.avatar_image}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Primary CTA */}
@@ -820,6 +850,20 @@ export const AdminDashboardPage: React.FC = () => {
                         <span>Choose</span>
                       </button>
                     </div>
+                    {profileForm.about_image && (
+                      <div className="mt-2 flex items-center gap-3 p-2 rounded-xl bg-bg-card border border-border">
+                        <img
+                          src={resolveAssetUrl(profileForm.about_image)}
+                          alt="About Preview"
+                          className="w-16 h-12 rounded-lg object-cover border border-border/60 bg-black/20"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-mono text-primary font-medium">About Image Active</p>
+                          <p className="text-xs text-text-muted truncate">{profileForm.about_image}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -954,7 +998,7 @@ export const AdminDashboardPage: React.FC = () => {
                     >
                       <div className="flex items-center gap-4 min-w-0">
                         <img
-                          src={p.image || '/images/hero.jpg'}
+                          src={resolveAssetUrl(p.image) || '/images/hero.jpg'}
                           alt={p.title}
                           className="w-16 h-12 rounded-xl object-cover border border-border shrink-0 bg-black/20"
                           onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}

@@ -5,7 +5,35 @@ import type {
   MediaAsset, SocialLink
 } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:8000/api/v1');
+export const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://portfolio-backend-0iys.onrender.com/api/v1' : 'http://localhost:8000/api/v1');
+
+export const BACKEND_ORIGIN = (import.meta.env.VITE_API_URL
+  ? import.meta.env.VITE_API_URL.replace(/\/api\/v1\/?$/, '')
+  : (import.meta.env.PROD ? 'https://portfolio-backend-0iys.onrender.com' : 'http://localhost:8000')
+).replace(/\/$/, '');
+
+/**
+ * Centrally normalizes asset URLs.
+ * Converts relative backend upload paths (e.g. /uploads/image.jpg) to absolute URLs pointing to the backend.
+ * Leaves absolute URLs (Cloudinary, external HTTP) and frontend assets (/images/hero.jpg) untouched.
+ */
+export function resolveAssetUrl(url?: string | null): string {
+  if (!url) return '';
+  const trimmed = url.trim();
+  if (
+    trimmed.startsWith('http://') ||
+    trimmed.startsWith('https://') ||
+    trimmed.startsWith('data:') ||
+    trimmed.startsWith('blob:')
+  ) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('uploads/')) {
+    const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+    return `${BACKEND_ORIGIN}${cleanPath}`;
+  }
+  return trimmed;
+}
 
 // Resilient offline fallback data layer
 export const FALLBACK_PROFILE: Profile = {
@@ -327,11 +355,23 @@ export async function fetchProfile(): Promise<Profile> {
     const res = await fetch(`${API_BASE}/profile`);
     if (!res.ok) throw new Error(`HTTP error ${res.status}`);
     const data = await res.json();
+    const heroImage = data.hero_image || data.heroImage || '/images/hero.jpg';
+    const resumeUrl = data.resume_url || data.resumeUrl || '/resume.pdf';
+    const heroImagePosition = data.hero_image_position || data.heroImagePosition || 'center 20%';
+    const avatarImage = data.avatar_image || data.avatarImage || '';
+    const aboutImage = data.about_image || data.aboutImage || '';
     return {
       ...data,
-      resumeUrl: data.resume_url || data.resumeUrl || '/resume.pdf',
-      heroImage: data.hero_image || data.heroImage || '/images/hero.jpg',
-      heroImagePosition: data.hero_image_position || data.heroImagePosition || 'center 20%'
+      hero_image: heroImage,
+      heroImage: heroImage,
+      resume_url: resumeUrl,
+      resumeUrl: resumeUrl,
+      hero_image_position: heroImagePosition,
+      heroImagePosition: heroImagePosition,
+      avatar_image: avatarImage,
+      avatarImage: avatarImage,
+      about_image: aboutImage,
+      aboutImage: aboutImage,
     };
   } catch (err) {
     console.warn('API fallback for profile:', err);
@@ -520,19 +560,49 @@ export async function updateSiteSettings(data: Partial<SiteSettings>): Promise<S
 
 export async function updateProfile(data: Partial<Profile>): Promise<Profile> {
   const d = data as any;
-  const payload = {
+  const heroImageVal = d.hero_image !== undefined ? d.hero_image : (data.heroImage !== undefined ? data.heroImage : undefined);
+  const resumeUrlVal = d.resume_url !== undefined ? d.resume_url : (data.resumeUrl !== undefined ? data.resumeUrl : undefined);
+  const heroPosVal = d.hero_image_position !== undefined ? d.hero_image_position : (data.heroImagePosition !== undefined ? data.heroImagePosition : undefined);
+  const avatarImageVal = d.avatar_image !== undefined ? d.avatar_image : (data.avatarImage !== undefined ? data.avatarImage : undefined);
+  const aboutImageVal = d.about_image !== undefined ? d.about_image : (data.aboutImage !== undefined ? data.aboutImage : undefined);
+
+  const payload: any = {
     ...data,
-    resume_url: data.resumeUrl || d.resume_url,
-    hero_image: data.heroImage || d.hero_image,
-    hero_image_position: data.heroImagePosition || d.hero_image_position
   };
+  if (heroImageVal !== undefined) payload.hero_image = heroImageVal;
+  if (resumeUrlVal !== undefined) payload.resume_url = resumeUrlVal;
+  if (heroPosVal !== undefined) payload.hero_image_position = heroPosVal;
+  if (avatarImageVal !== undefined) payload.avatar_image = avatarImageVal;
+  if (aboutImageVal !== undefined) payload.about_image = aboutImageVal;
+
   const res = await fetch(`${API_BASE}/profile`, {
     method: 'PUT',
     headers: getAuthHeaders(),
     body: JSON.stringify(payload)
   });
-  if (!res.ok) throw new Error('Failed to update profile');
-  return await res.json();
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to update profile' }));
+    throw new Error(err.detail || 'Failed to update profile');
+  }
+  const updated = await res.json();
+  const heroImage = updated.hero_image || updated.heroImage || '/images/hero.jpg';
+  const resumeUrl = updated.resume_url || updated.resumeUrl || '/resume.pdf';
+  const heroImagePosition = updated.hero_image_position || updated.heroImagePosition || 'center 20%';
+  const avatarImage = updated.avatar_image || updated.avatarImage || '';
+  const aboutImage = updated.about_image || updated.aboutImage || '';
+  return {
+    ...updated,
+    hero_image: heroImage,
+    heroImage: heroImage,
+    resume_url: resumeUrl,
+    resumeUrl: resumeUrl,
+    hero_image_position: heroImagePosition,
+    heroImagePosition: heroImagePosition,
+    avatar_image: avatarImage,
+    avatarImage: avatarImage,
+    about_image: aboutImage,
+    aboutImage: aboutImage,
+  };
 }
 
 export async function exportBackupJson(): Promise<void> {

@@ -4,6 +4,7 @@ import { Eye, FileText, MapPin, ChevronDown, Mail } from 'lucide-react';
 import { GithubIcon, LinkedinIcon } from '../ui/SocialIcons';
 import { TechLogo } from '../ui/TechLogos';
 import { useReducedMotion } from '../../hooks/useReducedMotion';
+import { resolveAssetUrl } from '../../api/client';
 import type { Profile, SiteSettings, Project } from '../../types';
 
 interface HeroSectionProps {
@@ -89,7 +90,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ profile, siteSettings,
     { name: 'TailwindCSS', label: 'Tailwind CSS' },
   ];
 
-  const heroImgSrc = profile.heroImage || (profile as any).hero_image || '/images/hero.jpg';
+  const heroImgSrc = resolveAssetUrl(
+    profile.heroImage || (profile as any).hero_image || (profile as any).avatar_image || '/images/hero.jpg'
+  );
+
+  useEffect(() => {
+    setImageError(false);
+  }, [heroImgSrc]);
 
   const availabilityText = siteSettings?.open_to_work ?? true
     ? "Available for Internships & Full-Stack Roles"
@@ -264,22 +271,19 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ profile, siteSettings,
             <div className="relative rounded-3xl p-[2px] bg-gradient-to-b from-primary/60 via-border to-secondary/50 shadow-2xl transition-all duration-300">
               <div className="relative rounded-[22px] overflow-hidden bg-bg-card border border-white/10 aspect-[4/5] flex items-center justify-center group">
                 {!imageError ? (
-                  <picture className="w-full h-full">
-                    <source srcSet={heroImgSrc} type="image/jpeg" />
-                    <img
-                      src={heroImgSrc}
-                      alt="Jampa Durga Lakshmi Narayana - Full-Stack Developer & AI Software Engineer"
-                      width="480"
-                      height="600"
-                      fetchPriority="high"
-                      decoding="async"
-                      style={{
-                        objectPosition: profile.heroImagePosition || (profile as any).hero_image_position || 'center 20%',
-                      }}
-                      className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
-                      onError={() => setImageError(true)}
-                    />
-                  </picture>
+                  <img
+                    src={heroImgSrc}
+                    alt={`${profile.name} - Full-Stack Developer & AI Software Engineer`}
+                    width="480"
+                    height="600"
+                    fetchPriority="high"
+                    decoding="async"
+                    style={{
+                      objectPosition: profile.heroImagePosition || (profile as any).hero_image_position || 'center 20%',
+                    }}
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
+                    onError={() => setImageError(true)}
+                  />
                 ) : (
                   /* Fallback Initials Avatar */
                   <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-tr from-bg-secondary to-bg-card p-6 text-center">
