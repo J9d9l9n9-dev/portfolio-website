@@ -383,8 +383,8 @@ The application incorporates multiple layers of defensive security:
 Deploy via Docker Compose on any VPS (AWS EC2, DigitalOcean Droplet, Linode, Render):
 ```bash
 # Clone repository
-git clone https://github.com/J9d9l9n9-dev/new-portfolio.git
-cd new-portfolio
+git clone https://github.com/J9d9l9n9-dev/portfolio-website.git
+cd portfolio-website
 
 # Configure environment
 cp .env.example .env

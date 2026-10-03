@@ -155,7 +155,7 @@ export const content: PortfolioContent = {
       tech: ["React 19", "TypeScript", "Tailwind CSS v4", "FastAPI", "SQLAlchemy", "JWT", "Docker"],
       image: "/images/projects/developer-portfolio/hero.png",
       live: "",
-      repo: "https://github.com/J9d9l9n9-dev/new-portfolio",
+      repo: "https://github.com/J9d9l9n9-dev/portfolio-website",
       category: "Full-Stack",
       longDescription: "A high-performance full-stack web application showcasing engineering capabilities, featuring authenticated admin management, rate-limited inquiries, and automated tests.",
       keyFeatures: [

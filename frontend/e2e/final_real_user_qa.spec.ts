@@ -158,7 +158,7 @@ test.describe('FINAL REAL-USER FUNCTIONAL QA & PRODUCTION HARDENING', () => {
     const portfolioCard = page.locator('#projects .grid > div', { hasText: 'Full-Stack Developer Portfolio' });
     await expect(portfolioCard.locator('a[aria-label*="Live demo"]')).toHaveCount(0);
     const portfolioRepo = portfolioCard.locator('a[aria-label*="Source repository"]');
-    await expect(portfolioRepo).toHaveAttribute('href', 'https://github.com/J9d9l9n9-dev/new-portfolio');
+    await expect(portfolioRepo).toHaveAttribute('href', 'https://github.com/J9d9l9n9-dev/portfolio-website');
 
     // =========================================================================
     // 8. PROJECT DETAIL CASE STUDY PAGES

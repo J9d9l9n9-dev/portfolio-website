@@ -291,7 +291,7 @@ export const FALLBACK_PROJECTS: Project[] = [
     image: "/images/projects/developer-portfolio/hero.png",
     gallery: ["/images/projects/developer-portfolio/hero.png"],
     live: undefined,
-    repo: "https://github.com/J9d9l9n9-dev/new-portfolio",
+    repo: "https://github.com/J9d9l9n9-dev/portfolio-website",
     featured: true,
   }
 ];
