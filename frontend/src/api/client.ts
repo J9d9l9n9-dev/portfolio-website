@@ -1,7 +1,8 @@
 import type {
   Profile, SkillCategory, Experience, Education, Project,
   ContactSubmission, ContactMessage, SiteSettings,
-  JourneyMilestone, Certification, Achievement, LearningItem
+  JourneyMilestone, Certification, Achievement, LearningItem,
+  MediaAsset, SocialLink
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:8000/api/v1');
@@ -809,7 +810,7 @@ export async function deleteContactMessage(id: number): Promise<void> {
 }
 
 // Image & File Upload
-export async function uploadImage(file: File): Promise<{ url: string }> {
+export async function uploadImage(file: File): Promise<{ url: string; secure_url: string; id: number; filename: string; width?: number; height?: number }> {
   const formData = new FormData();
   formData.append('file', file);
 
@@ -827,4 +828,106 @@ export async function uploadImage(file: File): Promise<{ url: string }> {
     throw new Error(err.detail || 'Upload failed');
   }
   return await res.json();
+}
+
+export async function uploadResume(file: File): Promise<{ url: string; secure_url: string; filename: string; size: number }> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = getAdminToken();
+  const res = await fetch(`${API_BASE}/upload/resume`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {})
+    },
+    body: formData
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Resume upload failed' }));
+    throw new Error(err.detail || 'Resume upload failed');
+  }
+  return await res.json();
+}
+
+// Media Library API Operations
+export async function fetchMediaAssets(q?: string): Promise<MediaAsset[]> {
+  const url = q ? `${API_BASE}/media?q=${encodeURIComponent(q)}` : `${API_BASE}/media`;
+  const res = await fetch(url, {
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to load media assets');
+  return await res.json();
+}
+
+export async function deleteMediaAsset(id: number, force: boolean = false): Promise<void> {
+  const url = force ? `${API_BASE}/media/${id}?force=true` : `${API_BASE}/media/${id}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: 'Failed to delete media asset' }));
+    throw new Error(err.detail || 'Failed to delete media asset');
+  }
+}
+
+// Project Actions: Duplicate & Publish
+export async function duplicateProject(id: number): Promise<Project> {
+  const res = await fetch(`${API_BASE}/projects/${id}/duplicate`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to duplicate project');
+  return await res.json();
+}
+
+export async function toggleProjectPublish(id: number): Promise<Project> {
+  const res = await fetch(`${API_BASE}/projects/${id}/publish`, {
+    method: 'PATCH',
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to toggle project publish state');
+  return await res.json();
+}
+
+// Social Links CRUD Operations
+export async function fetchSocialLinks(all: boolean = false): Promise<SocialLink[]> {
+  try {
+    const url = all ? `${API_BASE}/social-links?all_links=true` : `${API_BASE}/social-links`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Failed to fetch social links');
+    return await res.json();
+  } catch (err) {
+    console.warn('API fallback for social links:', err);
+    return [];
+  }
+}
+
+export async function createSocialLink(data: Partial<SocialLink>): Promise<SocialLink> {
+  const res = await fetch(`${API_BASE}/social-links`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Failed to create social link');
+  return await res.json();
+}
+
+export async function updateSocialLink(id: number, data: Partial<SocialLink>): Promise<SocialLink> {
+  const res = await fetch(`${API_BASE}/social-links/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error('Failed to update social link');
+  return await res.json();
+}
+
+export async function deleteSocialLink(id: number): Promise<void> {
+  const res = await fetch(`${API_BASE}/social-links/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+  if (!res.ok) throw new Error('Failed to delete social link');
 }

@@ -25,6 +25,19 @@ class Profile(Base):
     open_to_work = Column(Boolean, default=True)
     socials = Column(JSON, nullable=False)  # {"github": "...", "linkedin": "..."}
     stats = Column(JSON, nullable=False)    # [{"label": "...", "value": 3}]
+
+    # Extended CMS Hero & About fields (nullable with safe defaults)
+    cta_text = Column(String(100), nullable=True, default="View Projects")
+    cta_url = Column(String(255), nullable=True, default="#projects")
+    secondary_cta_text = Column(String(100), nullable=True, default="Contact Me")
+    secondary_cta_url = Column(String(255), nullable=True, default="#contact")
+    avatar_image = Column(String(255), nullable=True, default="")
+    about_heading = Column(String(255), nullable=True, default="About Me")
+    about_description = Column(Text, nullable=True, default="Engineering foundation, practical software development, and current technical focus.")
+    about_paragraphs = Column(JSON, nullable=True, default=list)
+    about_highlights = Column(JSON, nullable=True, default=list)
+    about_image = Column(String(255), nullable=True, default="")
+
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 class SiteSettings(Base):
@@ -36,6 +49,19 @@ class SiteSettings(Base):
     resume_url = Column(String(255), default="/resume.pdf")
     theme_default = Column(String(20), default="dark")
     contact_email = Column(String(100), default="jampadurgalakshminarayana@gmail.com")
+
+    # Extended CMS Website & SEO Settings (nullable with safe defaults)
+    site_title = Column(String(150), nullable=True, default="JDLN Portfolio")
+    site_description = Column(Text, nullable=True, default="Placement-Ready Engineering Portfolio")
+    seo_title = Column(String(150), nullable=True, default="Jampa Durga Lakshmi Narayana | Full-Stack & AI Engineer")
+    seo_description = Column(Text, nullable=True, default="Portfolio of Jampa Durga Lakshmi Narayana - Full-Stack Developer & AI Systems Engineer")
+    favicon_url = Column(String(255), nullable=True, default="/favicon.svg")
+    og_image_url = Column(String(255), nullable=True, default="/images/hero.jpg")
+    footer_text = Column(String(255), nullable=True, default="Engineered with precision. All rights reserved.")
+    location = Column(String(150), nullable=True, default="Visakhapatnam, Andhra Pradesh, India")
+    default_profile_image = Column(String(255), nullable=True, default="/images/hero.jpg")
+    default_resume_url = Column(String(255), nullable=True, default="/resume.pdf")
+
     updated_at = Column(DateTime, default=utcnow, onupdate=utcnow)
 
 class SocialLink(Base):
@@ -53,7 +79,7 @@ class Skill(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     category = Column(String(100), nullable=False)
-    items = Column(JSON, nullable=True)  # List[{"name": "...", "level": "Intermediate"}]
+    items = Column(JSON, nullable=True)  # List[{"name": "...", "level": "Intermediate", "logo": "..."}]
     chips = Column(JSON, nullable=True)  # List[str]
     order = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
@@ -92,6 +118,15 @@ class Experience(Base):
     order = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
 
+    # Extended CMS fields
+    location = Column(String(100), nullable=True)
+    start_date = Column(String(50), nullable=True)
+    end_date = Column(String(50), nullable=True)
+    is_current = Column(Boolean, default=False)
+    description = Column(Text, nullable=True)
+    technologies = Column(JSON, nullable=True, default=list)
+    company_logo = Column(String(255), nullable=True)
+
 class Education(Base):
     __tablename__ = "education"
 
@@ -101,6 +136,16 @@ class Education(Base):
     period = Column(String(100), nullable=False)
     order = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
+
+    # Extended CMS fields
+    institution = Column(String(150), nullable=True)
+    field_of_study = Column(String(150), nullable=True)
+    grade_cgpa = Column(String(50), nullable=True)
+    location = Column(String(100), nullable=True)
+    logo_url = Column(String(255), nullable=True)
+    start_date = Column(String(50), nullable=True)
+    end_date = Column(String(50), nullable=True)
+    description = Column(Text, nullable=True)
 
 class Project(Base):
     __tablename__ = "projects"
@@ -124,6 +169,12 @@ class Project(Base):
     featured = Column(Boolean, default=False)
     order = Column(Integer, default=0)
     is_published = Column(Boolean, default=True)
+
+    # Extended CMS fields
+    short_description = Column(Text, nullable=True)
+    full_description = Column(Text, nullable=True)
+    start_date = Column(String(50), nullable=True)
+    end_date = Column(String(50), nullable=True)
 
 class Certification(Base):
     __tablename__ = "certifications"
@@ -170,4 +221,19 @@ class AdminUser(Base):
     hashed_password = Column(String(255), nullable=False)
     failed_login_attempts = Column(Integer, default=0)
     locked_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=utcnow)
+
+class MediaAsset(Base):
+    __tablename__ = "media_assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String(255), nullable=False)
+    public_id = Column(String(255), nullable=True)
+    url = Column(String(500), nullable=False)
+    secure_url = Column(String(500), nullable=False)
+    format = Column(String(50), nullable=True)
+    size_bytes = Column(Integer, nullable=True)
+    width = Column(Integer, nullable=True)
+    height = Column(Integer, nullable=True)
+    content_type = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=utcnow)

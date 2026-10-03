@@ -21,6 +21,18 @@ class ProfileBase(BaseModel):
     socials: Dict[str, str]
     stats: List[Dict[str, Any]]
 
+    # Extended CMS fields
+    cta_text: Optional[str] = "View Projects"
+    cta_url: Optional[str] = "#projects"
+    secondary_cta_text: Optional[str] = "Contact Me"
+    secondary_cta_url: Optional[str] = "#contact"
+    avatar_image: Optional[str] = ""
+    about_heading: Optional[str] = "About Me"
+    about_description: Optional[str] = "Engineering foundation, practical software development, and current technical focus."
+    about_paragraphs: Optional[List[str]] = []
+    about_highlights: Optional[List[Dict[str, Any]]] = []
+    about_image: Optional[str] = ""
+
 class ProfileUpdate(BaseModel):
     name: Optional[str] = None
     short_name: Optional[str] = None
@@ -38,6 +50,16 @@ class ProfileUpdate(BaseModel):
     open_to_work: Optional[bool] = None
     socials: Optional[Dict[str, str]] = None
     stats: Optional[List[Dict[str, Any]]] = None
+    cta_text: Optional[str] = None
+    cta_url: Optional[str] = None
+    secondary_cta_text: Optional[str] = None
+    secondary_cta_url: Optional[str] = None
+    avatar_image: Optional[str] = None
+    about_heading: Optional[str] = None
+    about_description: Optional[str] = None
+    about_paragraphs: Optional[List[str]] = None
+    about_highlights: Optional[List[Dict[str, Any]]] = None
+    about_image: Optional[str] = None
 
 class ProfileOut(ProfileBase):
     id: int
@@ -52,6 +74,16 @@ class SiteSettingsBase(BaseModel):
     resume_url: str = "/resume.pdf"
     theme_default: str = "dark"
     contact_email: str = "jampadurgalakshminarayana@gmail.com"
+    site_title: Optional[str] = "JDLN Portfolio"
+    site_description: Optional[str] = "Placement-Ready Engineering Portfolio"
+    seo_title: Optional[str] = "Jampa Durga Lakshmi Narayana | Full-Stack & AI Engineer"
+    seo_description: Optional[str] = "Portfolio of Jampa Durga Lakshmi Narayana - Full-Stack Developer & AI Systems Engineer"
+    favicon_url: Optional[str] = "/favicon.svg"
+    og_image_url: Optional[str] = "/images/hero.jpg"
+    footer_text: Optional[str] = "Engineered with precision. All rights reserved."
+    location: Optional[str] = "Visakhapatnam, Andhra Pradesh, India"
+    default_profile_image: Optional[str] = "/images/hero.jpg"
+    default_resume_url: Optional[str] = "/resume.pdf"
 
 class SiteSettingsUpdate(BaseModel):
     open_to_work: Optional[bool] = None
@@ -59,6 +91,16 @@ class SiteSettingsUpdate(BaseModel):
     resume_url: Optional[str] = None
     theme_default: Optional[str] = None
     contact_email: Optional[str] = None
+    site_title: Optional[str] = None
+    site_description: Optional[str] = None
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    favicon_url: Optional[str] = None
+    og_image_url: Optional[str] = None
+    footer_text: Optional[str] = None
+    location: Optional[str] = None
+    default_profile_image: Optional[str] = None
+    default_resume_url: Optional[str] = None
 
 class SiteSettingsOut(SiteSettingsBase):
     id: int
@@ -162,7 +204,7 @@ class JourneyMilestoneOut(JourneyMilestoneBase):
 
 # Experience Schemas
 class ExperienceBase(BaseModel):
-    company: str
+    company: Optional[str] = None
     title: str
     role: Optional[str] = None
     type: Optional[str] = "project"
@@ -170,6 +212,13 @@ class ExperienceBase(BaseModel):
     points: List[str]
     order: Optional[int] = 0
     is_published: Optional[bool] = True
+    location: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_current: Optional[bool] = False
+    description: Optional[str] = None
+    technologies: Optional[List[str]] = []
+    company_logo: Optional[str] = None
 
 class ExperienceCreate(ExperienceBase):
     pass
@@ -183,6 +232,13 @@ class ExperienceUpdate(BaseModel):
     points: Optional[List[str]] = None
     order: Optional[int] = None
     is_published: Optional[bool] = None
+    location: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    is_current: Optional[bool] = None
+    description: Optional[str] = None
+    technologies: Optional[List[str]] = None
+    company_logo: Optional[str] = None
 
 class ExperienceOut(ExperienceBase):
     id: int
@@ -196,6 +252,14 @@ class EducationBase(BaseModel):
     period: str
     order: Optional[int] = 0
     is_published: Optional[bool] = True
+    institution: Optional[str] = None
+    field_of_study: Optional[str] = None
+    grade_cgpa: Optional[str] = None
+    location: Optional[str] = None
+    logo_url: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    description: Optional[str] = None
 
 class EducationCreate(EducationBase):
     pass
@@ -206,6 +270,14 @@ class EducationUpdate(BaseModel):
     period: Optional[str] = None
     order: Optional[int] = None
     is_published: Optional[bool] = None
+    institution: Optional[str] = None
+    field_of_study: Optional[str] = None
+    grade_cgpa: Optional[str] = None
+    location: Optional[str] = None
+    logo_url: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    description: Optional[str] = None
 
 class EducationOut(EducationBase):
     id: int
@@ -232,6 +304,10 @@ class ProjectBase(BaseModel):
     featured: Optional[bool] = False
     order: Optional[int] = 0
     is_published: Optional[bool] = True
+    short_description: Optional[str] = None
+    full_description: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 class ProjectCreate(ProjectBase):
     pass
@@ -255,9 +331,34 @@ class ProjectUpdate(BaseModel):
     featured: Optional[bool] = None
     order: Optional[int] = None
     is_published: Optional[bool] = None
+    short_description: Optional[str] = None
+    full_description: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
 
 class ProjectOut(ProjectBase):
     id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+# Media Asset Schemas
+class MediaAssetBase(BaseModel):
+    filename: str
+    public_id: Optional[str] = None
+    url: str
+    secure_url: str
+    format: Optional[str] = None
+    size_bytes: Optional[int] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    content_type: Optional[str] = None
+
+class MediaAssetCreate(MediaAssetBase):
+    pass
+
+class MediaAssetOut(MediaAssetBase):
+    id: int
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -342,7 +443,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: Optional[str] = None
     token_type: str = "bearer"
-    expires_in: int = 1800  # 30 minutes in seconds
+    expires_in: int = 1800
 
 class TokenData(BaseModel):
     username: Optional[str] = None

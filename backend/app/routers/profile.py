@@ -27,7 +27,7 @@ def update_profile(
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
 
-    update_data = updates.dict(exclude_unset=True)
+    update_data = updates.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(profile, key, value)
 

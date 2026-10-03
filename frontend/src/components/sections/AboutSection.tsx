@@ -17,10 +17,10 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ profile }) => {
             <span>Profile & Background</span>
           </div>
           <h2 className="font-display font-bold text-3xl sm:text-4xl text-text-primary tracking-tight">
-            About <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Me</span>
+            {profile.about_heading || 'About'} <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{profile.about_heading ? '' : 'Me'}</span>
           </h2>
           <p className="mt-2 text-text-secondary text-sm sm:text-base max-w-lg">
-            Engineering foundation, practical software development, and current technical focus.
+            {profile.about_description || 'Engineering foundation, practical software development, and current technical focus.'}
           </p>
           <div className="w-12 h-1 bg-gradient-to-r from-primary to-secondary rounded-full mt-3" />
         </div>
@@ -39,7 +39,7 @@ export const AboutSection: React.FC<AboutSectionProps> = ({ profile }) => {
               </h3>
               <div className="space-y-3.5 text-text-secondary text-sm sm:text-base leading-relaxed">
                 <p>
-                  I am a Computer Science Engineering undergraduate at GITAM Deemed to be University, Visakhapatnam. My work centers on building end-to-end web applications and practical AI systems that solve real problems.
+                  {profile.bio || 'I am a Computer Science Engineering undergraduate at GITAM Deemed to be University, Visakhapatnam. My work centers on building end-to-end web applications and practical AI systems that solve real problems.'}
                 </p>
                 <p>
                   I emphasize clean architecture, strong typing between frontend and backend, comprehensive test coverage, and intuitive user interfaces. I build with React, TypeScript, Python, FastAPI, and PostgreSQL.

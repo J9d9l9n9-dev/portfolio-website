@@ -11,20 +11,48 @@ export interface Socials {
   [key: string]: string | undefined;
 }
 
+export interface AboutHighlight {
+  title: string;
+  description: string;
+  icon?: string;
+  tag?: string;
+  order?: number;
+  is_active?: boolean;
+}
+
 export interface Profile {
   id?: number;
   name: string;
+  short_name?: string;
+  initials?: string;
   role: string[];
+  roles?: string[];
   tagline: string;
   bio: string;
   location: string;
   email: string;
   resumeUrl: string;
+  resume_url?: string;
   heroImage: string;
+  hero_image?: string;
   heroImagePosition?: string;
+  hero_image_position?: string;
   availability: string;
+  open_to_work?: boolean;
   socials: Socials;
   stats: StatItem[];
+
+  // Extended CMS Hero & About fields
+  cta_text?: string;
+  cta_url?: string;
+  secondary_cta_text?: string;
+  secondary_cta_url?: string;
+  avatar_image?: string;
+  about_heading?: string;
+  about_description?: string;
+  about_paragraphs?: string[];
+  about_highlights?: AboutHighlight[];
+  about_image?: string;
 }
 
 export interface SiteSettings {
@@ -34,6 +62,25 @@ export interface SiteSettings {
   resume_url: string;
   theme_default: string;
   contact_email: string;
+  site_title?: string;
+  site_description?: string;
+  seo_title?: string;
+  seo_description?: string;
+  favicon_url?: string;
+  og_image_url?: string;
+  footer_text?: string;
+  location?: string;
+  default_profile_image?: string;
+  default_resume_url?: string;
+}
+
+export interface SocialLink {
+  id?: number;
+  platform: string;
+  url: string;
+  icon: string;
+  order?: number;
+  is_active?: boolean;
 }
 
 export interface SkillItem {
@@ -97,10 +144,19 @@ export interface Experience {
   id?: number;
   company: string;
   title: string;
+  role?: string;
+  type?: string;
   period: string;
   points: string[];
   order?: number;
   is_published?: boolean;
+  location?: string;
+  start_date?: string;
+  end_date?: string;
+  is_current?: boolean;
+  description?: string;
+  technologies?: string[];
+  company_logo?: string;
 }
 
 export interface Education {
@@ -110,6 +166,14 @@ export interface Education {
   period: string;
   order?: number;
   is_published?: boolean;
+  institution?: string;
+  field_of_study?: string;
+  grade_cgpa?: string;
+  location?: string;
+  logo_url?: string;
+  start_date?: string;
+  end_date?: string;
+  description?: string;
 }
 
 export interface Project {
@@ -124,6 +188,7 @@ export interface Project {
   learnings?: string;
   tech: string[];
   category: string;
+  status?: string;
   image: string;
   gallery?: string[];
   live?: string;
@@ -131,6 +196,24 @@ export interface Project {
   featured?: boolean;
   order?: number;
   is_published?: boolean;
+  short_description?: string;
+  full_description?: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+export interface MediaAsset {
+  id: number;
+  filename: string;
+  public_id?: string;
+  url: string;
+  secure_url: string;
+  format?: string;
+  size_bytes?: number;
+  width?: number;
+  height?: number;
+  content_type?: string;
+  created_at?: string;
 }
 
 export interface ContactSubmission {

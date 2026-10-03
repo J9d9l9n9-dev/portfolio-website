@@ -136,29 +136,29 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ profile, siteSettings,
 
           {/* Concise Factual Introduction */}
           <p className="mt-4 text-base sm:text-lg text-text-secondary leading-relaxed max-w-xl">
-            Computer Science undergraduate at GITAM building scalable full-stack web applications and AI-powered software with modern frontend and backend technologies.
+            {profile.tagline || 'Computer Science undergraduate at GITAM building scalable full-stack web applications and AI-powered software with modern frontend and backend technologies.'}
           </p>
 
-          {/* Focused Primary Actions (Only Meaningful CTAs) */}
+          {/* Focused Primary Actions (Driven by CMS) */}
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <a
-              href="#projects"
+              href={profile.cta_url || '#projects'}
               className="btn-glow inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-sm text-white bg-primary hover:bg-primary-light transition-all duration-200 shadow-md"
             >
               <Eye className="w-4 h-4" />
-              <span>View Projects</span>
+              <span>{profile.cta_text || 'View Projects'}</span>
             </a>
 
             <a
-              href="#contact"
+              href={profile.secondary_cta_url || '#contact'}
               className="inline-flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm text-text-primary bg-bg-card hover:bg-white/10 border border-border hover:border-primary/40 transition-all duration-200"
             >
               <Mail className="w-4 h-4 text-primary" />
-              <span>Contact Me</span>
+              <span>{profile.secondary_cta_text || 'Contact Me'}</span>
             </a>
 
             <a
-              href={profile.resumeUrl || '/resume.pdf'}
+              href={profile.resumeUrl || profile.resume_url || '/resume.pdf'}
               download="JDLN_Resume.pdf"
               target="_blank"
               rel="noopener noreferrer"

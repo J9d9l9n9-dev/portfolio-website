@@ -14,26 +14,12 @@ import {
   createProject,
   updateProject,
   deleteProject,
+  duplicateProject,
+  toggleProjectPublish,
   fetchSkills,
   createSkill,
   updateSkill,
   deleteSkill,
-  fetchLearningItems,
-  createLearningItem,
-  updateLearningItem,
-  deleteLearningItem,
-  fetchJourneyMilestones,
-  createJourneyMilestone,
-  updateJourneyMilestone,
-  deleteJourneyMilestone,
-  fetchCertifications,
-  createCertification,
-  updateCertification,
-  deleteCertification,
-  fetchAchievements,
-  createAchievement,
-  updateAchievement,
-  deleteAchievement,
   fetchExperience,
   createExperience,
   updateExperience,
@@ -42,10 +28,15 @@ import {
   createEducation,
   updateEducation,
   deleteEducation,
-  uploadImage,
+  fetchSocialLinks,
+  createSocialLink,
+  updateSocialLink,
+  deleteSocialLink,
+  uploadResume,
   exportBackupJson,
   getAdminToken,
 } from '../api/client';
+import { MediaPickerModal } from '../components/admin/MediaPickerModal';
 import { useToast } from '../components/ui/Toast';
 import {
   ShieldCheck,
@@ -64,16 +55,24 @@ import {
   Briefcase,
   Copy,
   X,
-  Milestone,
-  Award,
-  Trophy,
-  Sliders,
   Download,
   Check,
+  LayoutDashboard,
+  Sparkles,
+  FileText,
+  Image as ImageIcon,
+  Share2,
+  GraduationCap,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  Search,
+  CheckCircle2,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import type {
   ContactMessage, Profile, Project, SkillCategory, Experience,
-  Education, JourneyMilestone, Certification, Achievement, LearningItem, SiteSettings
+  Education, SiteSettings, SocialLink
 } from '../types';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -86,26 +85,36 @@ export const AdminDashboardPage: React.FC = () => {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
 
-  // Active admin tab
+  // Active admin tab (matching target structure)
   const [activeTab, setActiveTab] = useState<
-    'messages' | 'profile' | 'settings' | 'projects' | 'skills' | 'journey' | 'certifications' | 'achievements' | 'timeline' | 'upload'
-  >('messages');
+    'dashboard' | 'hero' | 'about' | 'skills' | 'projects' | 'education' | 'experience' | 'resume' | 'media' | 'socials' | 'messages' | 'settings'
+  >('dashboard');
+
+  // Media Picker Modal State
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
+  const [mediaPickerTitle, setMediaPickerTitle] = useState('Select Image');
+  const [onMediaSelectedCallback, setOnMediaSelectedCallback] = useState<(url: string) => void>(() => () => {});
+
+  const openMediaPicker = (title: string, callback: (url: string) => void) => {
+    setMediaPickerTitle(title);
+    setOnMediaSelectedCallback(() => callback);
+    setMediaPickerOpen(true);
+  };
 
   // Contact messages state
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [messageSearch, setMessageSearch] = useState('');
+  const [messageFilter, setMessageFilter] = useState<'all' | 'unread' | 'read'>('all');
 
   // Queries
   const { data: profile } = useQuery({ queryKey: ['profile'], queryFn: fetchProfile, enabled: !!token });
   const { data: siteSettings } = useQuery({ queryKey: ['site-settings'], queryFn: fetchSiteSettings, enabled: !!token });
   const { data: projects = [] } = useQuery({ queryKey: ['projects'], queryFn: () => fetchProjects(), enabled: !!token });
   const { data: skills = [] } = useQuery({ queryKey: ['skills'], queryFn: fetchSkills, enabled: !!token });
-  const { data: learningItems = [] } = useQuery({ queryKey: ['learning-items'], queryFn: fetchLearningItems, enabled: !!token });
-  const { data: journey = [] } = useQuery({ queryKey: ['journey'], queryFn: fetchJourneyMilestones, enabled: !!token });
-  const { data: certifications = [] } = useQuery({ queryKey: ['certifications'], queryFn: fetchCertifications, enabled: !!token });
-  const { data: achievements = [] } = useQuery({ queryKey: ['achievements'], queryFn: fetchAchievements, enabled: !!token });
   const { data: experience = [] } = useQuery({ queryKey: ['experience'], queryFn: fetchExperience, enabled: !!token });
   const { data: education = [] } = useQuery({ queryKey: ['education'], queryFn: fetchEducation, enabled: !!token });
+  const { data: socialLinks = [] } = useQuery({ queryKey: ['social-links'], queryFn: () => fetchSocialLinks(true), enabled: !!token });
 
   // Form states
   const [profileForm, setProfileForm] = useState<Partial<Profile>>({});
@@ -113,13 +122,18 @@ export const AdminDashboardPage: React.FC = () => {
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Project Modal
+  // Resume Upload State
+  const [resumeUploading, setResumeUploading] = useState(false);
+
+  // Project Modal & State
   const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState<Partial<Project>>({
     title: '', slug: '', summary: '', problem: '', solution: '',
-    category: 'Full-Stack', image: '/images/project-planner.jpg',
-    live: '', repo: '', tech: [], features: [], featured: false, is_published: true
+    category: 'Full-Stack', image: '/images/hero.jpg',
+    gallery: [], live: '', repo: '', tech: [], features: [],
+    start_date: '', end_date: '', featured: false, is_published: true
   });
 
   // Skill Modal
@@ -127,44 +141,30 @@ export const AdminDashboardPage: React.FC = () => {
   const [editingSkill, setEditingSkill] = useState<SkillCategory | null>(null);
   const [skillForm, setSkillForm] = useState<{ category: string; itemsStr: string }>({ category: '', itemsStr: '' });
 
-  // Learning Modal
-  const [learningModalOpen, setLearningModalOpen] = useState(false);
-  const [editingLearning, setEditingLearning] = useState<LearningItem | null>(null);
-  const [learningForm, setLearningForm] = useState<Partial<LearningItem>>({ name: '', category: 'Distributed Systems', status: 'In Progress' });
-
-  // Journey Modal
-  const [journeyModalOpen, setJourneyModalOpen] = useState(false);
-  const [editingJourney, setEditingJourney] = useState<JourneyMilestone | null>(null);
-  const [journeyForm, setJourneyForm] = useState<Partial<JourneyMilestone>>({ year: '', title: '', description: '', tag: 'Milestone' });
-
-  // Certification Modal
-  const [certModalOpen, setCertModalOpen] = useState(false);
-  const [editingCert, setEditingCert] = useState<Certification | null>(null);
-  const [certForm, setCertForm] = useState<Partial<Certification>>({ title: '', issuer: '', date: '', credential_url: '' });
-
-  // Achievement Modal
-  const [achieveModalOpen, setAchieveModalOpen] = useState(false);
-  const [editingAchieve, setEditingAchieve] = useState<Achievement | null>(null);
-  const [achieveForm, setAchieveForm] = useState<Partial<Achievement>>({ title: '', organization: '', description: '', date: '', badge: 'Award' });
-
   // Experience Modal
   const [expModalOpen, setExpModalOpen] = useState(false);
   const [editingExp, setEditingExp] = useState<Experience | null>(null);
-  const [expForm, setExpForm] = useState<{ company: string; title: string; period: string; pointsStr: string }>({
-    company: '', title: '', period: '', pointsStr: ''
+  const [expForm, setExpForm] = useState<Partial<Experience> & { pointsStr: string; techStr: string }>({
+    company: '', title: '', location: '', start_date: '', end_date: '', is_current: false,
+    company_logo: '', description: '', pointsStr: '', techStr: ''
   });
 
   // Education Modal
   const [eduModalOpen, setEduModalOpen] = useState(false);
   const [editingEdu, setEditingEdu] = useState<Education | null>(null);
-  const [eduForm, setEduForm] = useState<Partial<Education>>({ school: '', degree: '', period: '' });
+  const [eduForm, setEduForm] = useState<Partial<Education>>({
+    school: '', degree: '', institution: '', field_of_study: '', grade_cgpa: '',
+    location: '', start_date: '', end_date: '', logo_url: '', description: ''
+  });
 
-  // Upload state
-  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [copiedUrl, setCopiedUrl] = useState(false);
+  // Social Link Modal
+  const [socialModalOpen, setSocialModalOpen] = useState(false);
+  const [editingSocial, setEditingSocial] = useState<SocialLink | null>(null);
+  const [socialForm, setSocialForm] = useState<Partial<SocialLink>>({
+    platform: '', url: '', icon: 'globe', order: 0, is_active: true
+  });
 
-  // Sync profile & settings
+  // Sync profile & settings into form state
   useEffect(() => {
     if (profile) setProfileForm(profile);
   }, [profile]);
@@ -173,7 +173,7 @@ export const AdminDashboardPage: React.FC = () => {
     if (siteSettings) setSettingsForm(siteSettings);
   }, [siteSettings]);
 
-  // Load contact messages
+  // Load inquiries
   useEffect(() => {
     if (token) loadMessages();
   }, [token]);
@@ -199,8 +199,7 @@ export const AdminDashboardPage: React.FC = () => {
       setToken(res.access_token);
       showToast('Signed in successfully with JWT token.', 'success');
     } catch (err: any) {
-      setLoginError(err.message || 'Invalid credentials.');
-      showToast(err.message || 'Authentication failed.', 'error');
+      setLoginError(err.message || 'Login failed');
     } finally {
       setLoginLoading(false);
     }
@@ -209,42 +208,18 @@ export const AdminDashboardPage: React.FC = () => {
   const handleLogout = async () => {
     await logoutAdmin();
     setToken(null);
-    setMessages([]);
-    showToast('Logged out of Admin Portal.', 'info');
+    showToast('Signed out of admin dashboard.', 'info');
   };
 
-  // Handlers for Contact Inquiries
-  const handleDeleteMessage = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this message?')) return;
-    try {
-      await deleteContactMessage(id);
-      setMessages((prev) => prev.filter((m) => m.id !== id));
-      showToast('Contact message deleted.', 'success');
-    } catch {
-      showToast('Failed to delete message.', 'error');
-    }
-  };
-
-  const handleToggleHandled = async (id: number) => {
-    try {
-      const updated = await toggleMessageHandled(id);
-      setMessages((prev) => prev.map((m) => (m.id === id ? updated : m)));
-      showToast('Inquiry status updated.', 'success');
-    } catch {
-      showToast('Failed to update status.', 'error');
-    }
-  };
-
-  // Profile and Settings Saves
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
     try {
       await updateProfile(profileForm);
-      await queryClient.invalidateQueries({ queryKey: ['profile'] });
-      showToast('Profile updated successfully!', 'success');
+      showToast('Hero & Profile changes saved! Public site updated immediately.', 'success');
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     } catch (err: any) {
-      showToast(err.message || 'Failed to update profile.', 'error');
+      showToast(err.message || 'Failed to update profile', 'error');
     } finally {
       setSavingProfile(false);
     }
@@ -255,300 +230,46 @@ export const AdminDashboardPage: React.FC = () => {
     setSavingSettings(true);
     try {
       await updateSiteSettings(settingsForm);
-      await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
-      showToast('Site settings updated!', 'success');
+      showToast('Website Settings saved successfully!', 'success');
+      queryClient.invalidateQueries({ queryKey: ['site-settings'] });
     } catch (err: any) {
-      showToast(err.message || 'Failed to update settings.', 'error');
+      showToast(err.message || 'Failed to update site settings', 'error');
     } finally {
       setSavingSettings(false);
     }
   };
 
-  // Export Backup
-  const handleExportBackup = async () => {
+  const handleResumeFileUpload = async (file: File) => {
+    setResumeUploading(true);
     try {
-      await exportBackupJson();
-      showToast('Backup JSON downloaded successfully.', 'success');
-    } catch {
-      showToast('Failed to export backup.', 'error');
-    }
-  };
-
-  // Upload handler
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const res = await uploadImage(file);
-      setUploadedUrl(res.url);
-      showToast('Image uploaded successfully!', 'success');
+      const res = await uploadResume(file);
+      showToast(`Resume uploaded successfully! URL: ${res.secure_url || res.url}`, 'success');
+      queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     } catch (err: any) {
-      showToast(err.message || 'Image upload failed.', 'error');
+      showToast(err.message || 'Resume upload failed', 'error');
     } finally {
-      setUploading(false);
+      setResumeUploading(false);
     }
   };
 
-  // Project CRUD
-  const handleSaveProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingProject && editingProject.id) {
-        await updateProject(editingProject.id, projectForm);
-        showToast('Project updated.', 'success');
-      } else {
-        await createProject(projectForm);
-        showToast('Project created.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-      setProjectModalOpen(false);
-      setEditingProject(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save project.', 'error');
-    }
-  };
-
-  const handleDeleteProject = async (id: number) => {
-    if (!confirm('Delete this project permanently?')) return;
-    try {
-      await deleteProject(id);
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-      showToast('Project deleted.', 'success');
-    } catch {
-      showToast('Failed to delete project.', 'error');
-    }
-  };
-
-  // Skill CRUD
-  const handleSaveSkill = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const items = skillForm.itemsStr.split(',').map((s) => s.trim()).filter(Boolean);
-      if (editingSkill && editingSkill.id) {
-        await updateSkill(editingSkill.id, { category: skillForm.category, items });
-        showToast('Skill group updated.', 'success');
-      } else {
-        await createSkill({ category: skillForm.category, items });
-        showToast('Skill group created.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['skills'] });
-      setSkillModalOpen(false);
-      setEditingSkill(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save skill group.', 'error');
-    }
-  };
-
-  const handleDeleteSkill = async (id: number) => {
-    if (!confirm('Delete this skill group?')) return;
-    try {
-      await deleteSkill(id);
-      await queryClient.invalidateQueries({ queryKey: ['skills'] });
-      showToast('Skill group deleted.', 'success');
-    } catch {
-      showToast('Failed to delete skill group.', 'error');
-    }
-  };
-
-  // Learning Item CRUD
-  const handleSaveLearning = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingLearning && editingLearning.id) {
-        await updateLearningItem(editingLearning.id, learningForm);
-        showToast('Learning goal updated.', 'success');
-      } else {
-        await createLearningItem(learningForm);
-        showToast('Learning goal created.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['learning-items'] });
-      setLearningModalOpen(false);
-      setEditingLearning(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save learning goal.', 'error');
-    }
-  };
-
-  const handleDeleteLearning = async (id: number) => {
-    if (!confirm('Delete this learning goal?')) return;
-    try {
-      await deleteLearningItem(id);
-      await queryClient.invalidateQueries({ queryKey: ['learning-items'] });
-      showToast('Learning goal deleted.', 'success');
-    } catch {
-      showToast('Failed to delete learning goal.', 'error');
-    }
-  };
-
-  // Journey CRUD
-  const handleSaveJourney = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingJourney && editingJourney.id) {
-        await updateJourneyMilestone(editingJourney.id, journeyForm);
-        showToast('Milestone updated.', 'success');
-      } else {
-        await createJourneyMilestone(journeyForm);
-        showToast('Milestone created.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['journey'] });
-      setJourneyModalOpen(false);
-      setEditingJourney(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save milestone.', 'error');
-    }
-  };
-
-  const handleDeleteJourney = async (id: number) => {
-    if (!confirm('Delete this milestone?')) return;
-    try {
-      await deleteJourneyMilestone(id);
-      await queryClient.invalidateQueries({ queryKey: ['journey'] });
-      showToast('Milestone deleted.', 'success');
-    } catch {
-      showToast('Failed to delete milestone.', 'error');
-    }
-  };
-
-  // Certifications CRUD
-  const handleSaveCert = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingCert && editingCert.id) {
-        await updateCertification(editingCert.id, certForm);
-        showToast('Certification updated.', 'success');
-      } else {
-        await createCertification(certForm);
-        showToast('Certification added.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['certifications'] });
-      setCertModalOpen(false);
-      setEditingCert(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save certification.', 'error');
-    }
-  };
-
-  const handleDeleteCert = async (id: number) => {
-    if (!confirm('Delete this certification?')) return;
-    try {
-      await deleteCertification(id);
-      await queryClient.invalidateQueries({ queryKey: ['certifications'] });
-      showToast('Certification deleted.', 'success');
-    } catch {
-      showToast('Failed to delete certification.', 'error');
-    }
-  };
-
-  // Achievements CRUD
-  const handleSaveAchieve = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingAchieve && editingAchieve.id) {
-        await updateAchievement(editingAchieve.id, achieveForm);
-        showToast('Achievement updated.', 'success');
-      } else {
-        await createAchievement(achieveForm);
-        showToast('Achievement added.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['achievements'] });
-      setAchieveModalOpen(false);
-      setEditingAchieve(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save achievement.', 'error');
-    }
-  };
-
-  const handleDeleteAchieve = async (id: number) => {
-    if (!confirm('Delete this achievement?')) return;
-    try {
-      await deleteAchievement(id);
-      await queryClient.invalidateQueries({ queryKey: ['achievements'] });
-      showToast('Achievement deleted.', 'success');
-    } catch {
-      showToast('Failed to delete achievement.', 'error');
-    }
-  };
-
-  // Experience CRUD
-  const handleSaveExp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const points = expForm.pointsStr.split('\n').map((p) => p.trim()).filter(Boolean);
-      if (editingExp && editingExp.id) {
-        await updateExperience(editingExp.id, { ...expForm, points });
-        showToast('Experience updated.', 'success');
-      } else {
-        await createExperience({ ...expForm, points });
-        showToast('Experience created.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['experience'] });
-      setExpModalOpen(false);
-      setEditingExp(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save experience.', 'error');
-    }
-  };
-
-  const handleDeleteExp = async (id: number) => {
-    if (!confirm('Delete this experience?')) return;
-    try {
-      await deleteExperience(id);
-      await queryClient.invalidateQueries({ queryKey: ['experience'] });
-      showToast('Experience deleted.', 'success');
-    } catch {
-      showToast('Failed to delete experience.', 'error');
-    }
-  };
-
-  // Education CRUD
-  const handleSaveEdu = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingEdu && editingEdu.id) {
-        await updateEducation(editingEdu.id, eduForm);
-        showToast('Education updated.', 'success');
-      } else {
-        await createEducation(eduForm);
-        showToast('Education added.', 'success');
-      }
-      await queryClient.invalidateQueries({ queryKey: ['education'] });
-      setEduModalOpen(false);
-      setEditingEdu(null);
-    } catch (err: any) {
-      showToast(err.message || 'Failed to save education.', 'error');
-    }
-  };
-
-  const handleDeleteEdu = async (id: number) => {
-    if (!confirm('Delete this education record?')) return;
-    try {
-      await deleteEducation(id);
-      await queryClient.invalidateQueries({ queryKey: ['education'] });
-      showToast('Education record deleted.', 'success');
-    } catch {
-      showToast('Failed to delete education record.', 'error');
-    }
-  };
-
-  // Login View if Unauthenticated
+  // If not logged in, render authentication portal
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-16 bg-bg relative">
-        <div className="w-full max-w-md glass-card p-8 rounded-3xl border border-border shadow-2xl relative z-10">
-          <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary to-secondary flex items-center justify-center mx-auto text-white shadow-lg mb-4">
-              <Lock className="w-7 h-7" />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-bg-primary">
+        <div className="w-full max-w-md p-8 rounded-3xl bg-bg-card border border-border shadow-2xl">
+          <div className="flex flex-col items-center text-center mb-8">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 border border-primary/20 shadow-inner">
+              <ShieldCheck className="w-8 h-8" />
             </div>
-            <h1 className="font-display font-extrabold text-2xl text-text-primary">Owner Admin Console</h1>
-            <p className="text-xs text-text-muted mt-2">
-              Protected Endpoint (/admin). Enter your administrative credentials to manage portfolio content.
+            <h1 className="font-display font-bold text-2xl text-text-primary">Portfolio Admin CMS</h1>
+            <p className="text-xs font-mono text-text-muted mt-1">
+              Secured with JWT authentication & lockout protection
             </p>
           </div>
 
           {loginError && (
-            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+            <div className="p-3.5 mb-6 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{loginError}</span>
             </div>
@@ -556,1195 +277,1838 @@ export const AdminDashboardPage: React.FC = () => {
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-mono font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1.5">
                 Admin Email
               </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="jampadurgalakshminarayana@gmail.com"
-                className="w-full px-4 py-2.5 rounded-xl bg-bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-primary transition-colors"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
 
             <div>
-              <label className="block text-xs font-mono font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1.5">
                 Password
               </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••••"
-                className="w-full px-4 py-2.5 rounded-xl bg-bg-surface border border-border text-sm text-text-primary focus:outline-none focus:border-primary transition-colors"
-              />
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                <input
+                  type="password"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary"
+                />
+              </div>
             </div>
 
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full py-3 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover shadow-md transition-all flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover transition-colors flex items-center justify-center gap-2 shadow-lg disabled:opacity-50"
             >
-              {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}
-              <span>Sign In to Console</span>
+              {loginLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                <span>Sign In to CMS</span>
+              )}
             </button>
           </form>
+
+          <div className="mt-8 pt-6 border-t border-border/50 text-center">
+            <a href="/" className="text-xs text-text-muted hover:text-primary transition-colors flex items-center justify-center gap-1.5">
+              <span>Return to Public Portfolio</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Navigation Items
+  const navItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'hero', label: 'Hero Section', icon: Sparkles },
+    { id: 'about', label: 'About & Highlights', icon: User },
+    { id: 'skills', label: 'Skills & Tech', icon: Cpu },
+    { id: 'projects', label: 'Projects CMS', icon: FolderGit2, badge: projects.length },
+    { id: 'education', label: 'Education', icon: GraduationCap },
+    { id: 'experience', label: 'Experience', icon: Briefcase },
+    { id: 'resume', label: 'Resume PDF', icon: FileText },
+    { id: 'media', label: 'Media Library', icon: ImageIcon },
+    { id: 'socials', label: 'Social Links', icon: Share2 },
+    { id: 'messages', label: 'Inquiries', icon: Mail, badge: messages.filter(m => !m.is_handled).length },
+    { id: 'settings', label: 'Website Settings', icon: SettingsIcon },
+  ];
+
   return (
-    <div className="min-h-screen bg-bg text-text-primary pt-24 pb-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border mb-8">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
-              <ShieldCheck className="w-5 h-5" />
+    <div className="min-h-screen bg-bg-primary flex flex-col md:flex-row">
+      {/* Sidebar Navigation */}
+      <aside className="w-full md:w-64 bg-bg-card border-r border-border flex flex-col shrink-0">
+        {/* Brand */}
+        <div className="p-5 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-display font-bold text-base border border-primary/20">
+              CMS
             </div>
             <div>
-              <h1 className="font-display font-extrabold text-2xl text-text-primary">Admin Control Center</h1>
-              <p className="text-xs text-text-muted font-mono">Single-Owner Management Portal (FastAPI + PostgreSQL)</p>
+              <h2 className="font-display font-bold text-sm text-text-primary">Portfolio Admin</h2>
+              <span className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live Production
+              </span>
             </div>
           </div>
+          <a
+            href="/"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open Live Website"
+            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+          </a>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={handleExportBackup}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-white/5 border border-border hover:border-primary/50 text-text-primary transition-colors"
-            title="Download full database content as JSON"
-          >
-            <Download className="w-3.5 h-3.5 text-secondary" />
-            <span>Export Backup JSON</span>
-          </button>
+        {/* Navigation list */}
+        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id as any)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  isActive
+                    ? 'bg-primary text-white shadow-md shadow-primary/20'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-hover'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-text-muted'}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
+        {/* User Footer */}
+        <div className="p-4 border-t border-border flex items-center justify-between bg-bg-card/50">
+          <div className="flex items-center gap-2 truncate">
+            <div className="w-7 h-7 rounded-full bg-secondary/10 text-secondary flex items-center justify-center font-bold text-xs">
+              AD
+            </div>
+            <span className="text-xs font-medium text-text-secondary truncate">Owner</span>
+          </div>
           <button
             onClick={handleLogout}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 transition-colors"
+            title="Sign Out"
+            className="p-2 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Sign Out</span>
+            <LogOut className="w-4 h-4" />
           </button>
         </div>
-      </div>
+      </aside>
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-1 pb-4 overflow-x-auto border-b border-border/60 mb-8 scrollbar-none">
-        {[
-          { id: 'messages', label: 'Inquiries', icon: Mail, count: messages.length },
-          { id: 'settings', label: 'Site Settings', icon: Sliders },
-          { id: 'profile', label: 'Profile & Bio', icon: User },
-          { id: 'projects', label: 'Projects', icon: FolderGit2, count: projects.length },
-          { id: 'journey', label: 'Journey Milestones', icon: Milestone, count: journey.length },
-          { id: 'skills', label: 'Skills & Learning', icon: Cpu, count: skills.length + learningItems.length },
-          { id: 'certifications', label: 'Certifications', icon: Award, count: certifications.length },
-          { id: 'achievements', label: 'Achievements', icon: Trophy, count: achievements.length },
-          { id: 'timeline', label: 'Experience & Edu', icon: Briefcase, count: experience.length + education.length },
-          { id: 'upload', label: 'Asset Storage', icon: Upload },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-y-auto max-h-screen">
+        {/* Top Header */}
+        <header className="h-16 px-6 border-b border-border bg-bg-card/30 backdrop-blur flex items-center justify-between shrink-0">
+          <div>
+            <h1 className="font-display font-bold text-lg text-text-primary capitalize">
+              {activeTab === 'socials' ? 'Social Links CMS' : `${activeTab} Management`}
+            </h1>
+            <p className="text-xs text-text-muted">
+              Changes made here are stored in the database and immediately appear on the public portfolio.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
-                active
-                  ? 'bg-primary text-white shadow-sm'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
-              }`}
+              onClick={() => exportBackupJson()}
+              className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-bg-hover flex items-center gap-1.5 transition-colors"
+              title="Download full JSON backup of portfolio content"
             >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono ${active ? 'bg-white/20' : 'bg-white/5'}`}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Tab: Messages */}
-      {activeTab === 'messages' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-text-primary">Contact Inquiries Inbox</h2>
-            <button
-              onClick={loadMessages}
-              disabled={loadingMessages}
-              className="text-xs font-mono text-primary hover:underline"
-            >
-              Refresh Inbox
+              <Download className="w-3.5 h-3.5 text-primary" />
+              <span>Export Backup</span>
             </button>
           </div>
+        </header>
 
-          {loadingMessages ? (
-            <div className="py-12 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
-          ) : messages.length === 0 ? (
-            <div className="glass-card p-12 text-center rounded-2xl text-text-muted text-sm">
-              Inbox empty. No inquiries received yet.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4">
-              {messages.map((m) => (
-                <div key={m.id} className="glass-card p-5 rounded-2xl border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-sm text-text-primary">{m.name}</span>
-                      <span className="text-xs text-text-muted">&lt;{m.email}&gt;</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono ${m.is_handled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
-                        {m.is_handled ? 'Handled' : 'Pending Action'}
-                      </span>
-                    </div>
-                    <div className="font-semibold text-xs text-primary">{m.subject}</div>
-                    <p className="text-xs text-text-secondary mt-1">{m.message}</p>
-                    <div className="text-[11px] font-mono text-text-muted">{new Date(m.created_at).toLocaleString()}</div>
+        {/* Tab Views */}
+        <div className="p-6 max-w-6xl w-full mx-auto space-y-6 flex-1">
+          {/* 1. DASHBOARD VIEW */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              {/* Quick Metrics */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm">
+                  <div className="flex items-center justify-between text-text-muted mb-2">
+                    <span className="text-xs font-mono uppercase">Projects</span>
+                    <FolderGit2 className="w-4 h-4 text-primary" />
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="font-display font-bold text-2xl text-text-primary">{projects.length}</div>
+                  <span className="text-[11px] text-text-muted">{projects.filter(p => p.featured).length} featured</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm">
+                  <div className="flex items-center justify-between text-text-muted mb-2">
+                    <span className="text-xs font-mono uppercase">Skills</span>
+                    <Cpu className="w-4 h-4 text-secondary" />
+                  </div>
+                  <div className="font-display font-bold text-2xl text-text-primary">{skills.length}</div>
+                  <span className="text-[11px] text-text-muted">categories defined</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm">
+                  <div className="flex items-center justify-between text-text-muted mb-2">
+                    <span className="text-xs font-mono uppercase">Inquiries</span>
+                    <Mail className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div className="font-display font-bold text-2xl text-text-primary">{messages.length}</div>
+                  <span className="text-[11px] text-amber-400 font-semibold">{messages.filter(m => !m.is_handled).length} unhandled</span>
+                </div>
+
+                <div className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm">
+                  <div className="flex items-center justify-between text-text-muted mb-2">
+                    <span className="text-xs font-mono uppercase">System</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div className="font-display font-bold text-2xl text-emerald-400">Active</div>
+                  <span className="text-[11px] text-text-muted">PostgreSQL Connected</span>
+                </div>
+              </div>
+
+              {/* Quick Actions Card */}
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-primary/10 via-secondary/10 to-transparent border border-primary/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-display font-bold text-lg text-text-primary">Welcome to your Portfolio CMS</h3>
+                    <p className="text-xs text-text-secondary mt-1 max-w-xl">
+                      Manage every detail of your placement-grade portfolio in real-time. Upload images directly from your computer, create projects, adjust skills, and reply to hiring inquiries.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleToggleHandled(m.id)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/5 border border-border hover:border-primary/50 text-text-secondary"
+                      onClick={() => {
+                        setEditingProject(null);
+                        setProjectForm({
+                          title: '', slug: '', summary: '', problem: '', solution: '',
+                          category: 'Full-Stack', image: '/images/hero.jpg', gallery: [],
+                          live: '', repo: '', tech: [], features: [], is_published: true
+                        });
+                        setProjectModalOpen(true);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
                     >
-                      {m.is_handled ? 'Mark Pending' : 'Mark Handled'}
+                      <Plus className="w-4 h-4" />
+                      <span>New Project</span>
                     </button>
                     <button
-                      onClick={() => handleDeleteMessage(m.id)}
-                      className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                      onClick={() => setActiveTab('media')}
+                      className="px-4 py-2 rounded-xl border border-border bg-bg-card text-text-primary text-xs font-semibold hover:bg-bg-hover transition-colors flex items-center gap-1.5"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <ImageIcon className="w-4 h-4 text-primary" />
+                      <span>Media Library</span>
                     </button>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Recent Inquiries Preview */}
+              <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display font-bold text-base text-text-primary flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-primary" />
+                    <span>Recent Hiring & Collaboration Inquiries</span>
+                  </h3>
+                  <button
+                    onClick={() => setActiveTab('messages')}
+                    className="text-xs font-semibold text-primary hover:underline"
+                  >
+                    View all ({messages.length})
+                  </button>
+                </div>
+                {messages.length === 0 ? (
+                  <p className="text-xs text-text-muted py-4">No contact messages received yet.</p>
+                ) : (
+                  <div className="divide-y divide-border/50">
+                    {messages.slice(0, 3).map((m) => (
+                      <div key={m.id} className="py-3 flex items-center justify-between gap-4">
+                        <div className="truncate">
+                          <p className="text-xs font-bold text-text-primary truncate">{m.name} &bull; <span className="font-normal text-text-secondary">{m.subject}</span></p>
+                          <p className="text-[11px] text-text-muted truncate">{m.message}</p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${m.is_handled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                          {m.is_handled ? 'Handled' : 'New'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Tab: Site Settings */}
-      {activeTab === 'settings' && (
-        <form onSubmit={handleSaveSettings} className="glass-card p-6 sm:p-8 rounded-3xl border border-border max-w-2xl space-y-6">
-          <h2 className="font-display font-bold text-lg text-text-primary">Site Global Settings</h2>
-          
-          <div className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              id="open_to_work"
-              checked={settingsForm.open_to_work ?? true}
-              onChange={(e) => setSettingsForm({ ...settingsForm, open_to_work: e.target.checked })}
-              className="w-4 h-4 rounded text-primary"
-            />
-            <label htmlFor="open_to_work" className="text-sm font-semibold text-text-primary">
-              Open to Work Badge Active (Controls live availability chip on Hero)
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">
-              Work Status Text
-            </label>
-            <input
-              type="text"
-              value={settingsForm.work_status_text || ''}
-              onChange={(e) => setSettingsForm({ ...settingsForm, work_status_text: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-bg-surface border border-border text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">
-              Public Resume File URL
-            </label>
-            <input
-              type="text"
-              value={settingsForm.resume_url || ''}
-              onChange={(e) => setSettingsForm({ ...settingsForm, resume_url: e.target.value })}
-              className="w-full px-4 py-2.5 rounded-xl bg-bg-surface border border-border text-sm"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={savingSettings}
-            className="px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-white bg-primary hover:bg-primary-hover transition-colors"
-          >
-            {savingSettings ? 'Saving...' : 'Save Settings'}
-          </button>
-        </form>
-      )}
-
-      {/* Tab: Profile */}
-      {activeTab === 'profile' && (
-        <form onSubmit={handleSaveProfile} className="glass-card p-6 sm:p-8 rounded-3xl border border-border max-w-3xl space-y-5">
-          <h2 className="font-display font-bold text-lg text-text-primary">Personal Profile & Bio</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">Name</label>
-              <input
-                type="text"
-                value={profileForm.name || ''}
-                onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">Location</label>
-              <input
-                type="text"
-                value={profileForm.location || ''}
-                onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
-                className="w-full px-4 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">Headline Tagline</label>
-            <input
-              type="text"
-              value={profileForm.tagline || ''}
-              onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs font-mono font-semibold text-text-secondary uppercase mb-1">Bio</label>
-            <textarea
-              rows={4}
-              value={profileForm.bio || ''}
-              onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
-              className="w-full px-4 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={savingProfile}
-            className="px-6 py-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider text-white bg-primary hover:bg-primary-hover transition-colors"
-          >
-            {savingProfile ? 'Saving...' : 'Save Profile'}
-          </button>
-        </form>
-      )}
-
-      {/* Tab: Projects */}
-      {activeTab === 'projects' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-text-primary">Featured Projects ({projects.length})</h2>
-            <button
-              onClick={() => {
-                setEditingProject(null);
-                setProjectForm({
-                  title: '', slug: '', summary: '', problem: '', solution: '',
-                  category: 'Full-Stack', image: '/images/project-planner.jpg',
-                  live: '', repo: '', tech: ['React', 'FastAPI'], features: ['Feature 1'], is_published: true
-                });
-                setProjectModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Project</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {projects.map((p) => (
-              <div key={p.slug} className="glass-card p-5 rounded-2xl border border-border flex items-start justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-base text-text-primary">{p.title}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary">{p.category}</span>
-                  </div>
-                  <p className="text-xs text-text-secondary line-clamp-2">{p.summary}</p>
+          {/* 2. HERO SECTION CMS */}
+          {activeTab === 'hero' && (
+            <form onSubmit={handleSaveProfile} className="space-y-6">
+              <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm space-y-6">
+                <div className="border-b border-border pb-4">
+                  <h3 className="font-display font-bold text-base text-text-primary">Hero Banner & Identity</h3>
+                  <p className="text-xs text-text-muted mt-0.5">Control the main headline, subtitle, avatar image, and primary call-to-actions.</p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      setEditingProject(p);
-                      setProjectForm(p);
-                      setProjectModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => p.id && handleDeleteProject(p.id)}
-                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Tab: Skills & Learning */}
-      {activeTab === 'skills' && (
-        <div className="space-y-8">
-          {/* Skill Groups */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-bold text-lg text-text-primary">Domain Skill Categories ({skills.length})</h2>
-              <button
-                onClick={() => {
-                  setEditingSkill(null);
-                  setSkillForm({ category: '', itemsStr: '' });
-                  setSkillModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Skill Group</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {skills.map((s) => (
-                <div key={s.category} className="glass-card p-5 rounded-2xl border border-border flex items-start justify-between gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <h3 className="font-bold text-sm text-text-primary">{s.category}</h3>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {(s.items || (s.chips ? s.chips.map((c) => ({ name: c })) : [])).map((it, i) => (
-                        <span key={i} className="text-[11px] font-mono px-2 py-0.5 rounded bg-white/5 border border-border text-text-secondary">
-                          {typeof it === 'string' ? it : it.name}
-                        </span>
-                      ))}
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.name || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Short / Display Name
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.short_name || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, short_name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Professional Tagline / Subtitle
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.tagline || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, tagline: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Hero Background Image URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={profileForm.hero_image || profileForm.heroImage || ''}
+                        onChange={(e) => setProfileForm({ ...profileForm, hero_image: e.target.value, heroImage: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openMediaPicker('Select Hero Background Image', (url) => setProfileForm({ ...profileForm, hero_image: url, heroImage: url }))}
+                        className="px-3 py-2 rounded-xl border border-border bg-bg-hover text-xs font-semibold hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                        <span>Choose</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditingSkill(s);
-                        setSkillForm({
-                          category: s.category,
-                          itemsStr: (s.items ? s.items.map((it) => (typeof it === 'string' ? it : it.name)) : (s.chips || [])).join(', ')
-                        });
-                        setSkillModalOpen(true);
-                      }}
-                      className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => s.id && handleDeleteSkill(s.id)}
-                      className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Currently Learning Goals */}
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-bold text-lg text-text-primary">Currently Learning Goals ({learningItems.length})</h2>
-              <button
-                onClick={() => {
-                  setEditingLearning(null);
-                  setLearningForm({ name: '', category: 'Distributed Systems', status: 'In Progress' });
-                  setLearningModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-secondary hover:bg-secondary/80 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Learning Goal</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {learningItems.map((item) => (
-                <div key={item.id || item.name} className="glass-card p-4 rounded-xl border border-border flex items-center justify-between gap-4">
                   <div>
-                    <span className="font-bold text-xs text-text-primary">{item.name}</span>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[10px] font-mono text-text-muted">{item.category}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-secondary/10 text-secondary">{item.status}</span>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Avatar / Profile Portrait URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={profileForm.avatar_image || ''}
+                        onChange={(e) => setProfileForm({ ...profileForm, avatar_image: e.target.value })}
+                        placeholder="/images/avatar.jpg"
+                        className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openMediaPicker('Select Avatar Portrait', (url) => setProfileForm({ ...profileForm, avatar_image: url }))}
+                        className="px-3 py-2 rounded-xl border border-border bg-bg-hover text-xs font-semibold hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-secondary" />
+                        <span>Choose</span>
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => {
-                        setEditingLearning(item);
-                        setLearningForm(item);
-                        setLearningModalOpen(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => item.id && handleDeleteLearning(item.id)}
-                      className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Tab: Journey Milestones */}
-      {activeTab === 'journey' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-text-primary">Journey Milestones ({journey.length})</h2>
-            <button
-              onClick={() => {
-                setEditingJourney(null);
-                setJourneyForm({ year: '2025', title: '', description: '', tag: 'Milestone' });
-                setJourneyModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Milestone</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4">
-            {journey.map((m) => (
-              <div key={m.id || m.year} className="glass-card p-5 rounded-2xl border border-border flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-primary/10 text-primary">{m.year}</span>
-                    <span className="font-bold text-sm text-text-primary">{m.title}</span>
-                    {m.tag && <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-secondary/10 text-secondary">{m.tag}</span>}
-                  </div>
-                  <p className="text-xs text-text-secondary">{m.description}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      setEditingJourney(m);
-                      setJourneyForm(m);
-                      setJourneyModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => m.id && handleDeleteJourney(m.id)}
-                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Certifications */}
-      {activeTab === 'certifications' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-text-primary">Certifications ({certifications.length})</h2>
-            <button
-              onClick={() => {
-                setEditingCert(null);
-                setCertForm({ title: '', issuer: '', date: '2025', credential_url: '' });
-                setCertModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Certification</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {certifications.map((c) => (
-              <div key={c.id || c.title} className="glass-card p-5 rounded-2xl border border-border flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="font-bold text-sm text-text-primary">{c.title}</h3>
-                  <p className="text-xs text-text-secondary">{c.issuer} • {c.date}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      setEditingCert(c);
-                      setCertForm(c);
-                      setCertModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => c.id && handleDeleteCert(c.id)}
-                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Achievements */}
-      {activeTab === 'achievements' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="font-display font-bold text-lg text-text-primary">Achievements & Honors ({achievements.length})</h2>
-            <button
-              onClick={() => {
-                setEditingAchieve(null);
-                setAchieveForm({ title: '', organization: '', description: '', date: '2025', badge: 'Award' });
-                setAchieveModalOpen(true);
-              }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>Add Achievement</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {achievements.map((a) => (
-              <div key={a.id || a.title} className="glass-card p-5 rounded-2xl border border-border flex items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-bold text-sm text-text-primary">{a.title}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-accent/10 text-accent">{a.badge}</span>
-                  </div>
-                  <p className="text-xs text-text-secondary">{a.organization} • {a.date}</p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => {
-                      setEditingAchieve(a);
-                      setAchieveForm(a);
-                      setAchieveModalOpen(true);
-                    }}
-                    className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={() => a.id && handleDeleteAchieve(a.id)}
-                    className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tab: Experience & Education Timeline */}
-      {activeTab === 'timeline' && (
-        <div className="space-y-8">
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-bold text-lg text-text-primary">Engineering Experience ({experience.length})</h2>
-              <button
-                onClick={() => {
-                  setEditingExp(null);
-                  setExpForm({ company: '', title: '', period: '', pointsStr: '' });
-                  setExpModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Experience</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {experience.map((exp) => (
-                <div key={exp.company} className="glass-card p-5 rounded-2xl border border-border flex items-start justify-between gap-4">
+                  {/* Primary CTA */}
                   <div>
-                    <h3 className="font-bold text-sm text-text-primary">{exp.title}</h3>
-                    <p className="text-xs font-semibold text-secondary">{exp.company} • {exp.period}</p>
-                    <ul className="list-disc list-inside mt-2 text-xs text-text-muted space-y-1">
-                      {exp.points.map((pt, i) => (
-                        <li key={i} className="line-clamp-1">{pt}</li>
-                      ))}
-                    </ul>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Primary CTA Text
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.cta_text || 'View Projects'}
+                      onChange={(e) => setProfileForm({ ...profileForm, cta_text: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditingExp(exp);
-                        setExpForm({
-                          company: exp.company,
-                          title: exp.title,
-                          period: exp.period,
-                          pointsStr: exp.points.join('\n')
-                        });
-                        setExpModalOpen(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => exp.id && handleDeleteExp(exp.id)}
-                      className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-display font-bold text-lg text-text-primary">Academic Education ({education.length})</h2>
-              <button
-                onClick={() => {
-                  setEditingEdu(null);
-                  setEduForm({ school: '', degree: '', period: '' });
-                  setEduModalOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-primary hover:bg-primary-hover shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Education</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {education.map((edu) => (
-                <div key={edu.school} className="glass-card p-5 rounded-2xl border border-border flex items-center justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-sm text-text-primary">{edu.school}</h3>
-                    <p className="text-xs text-text-secondary">{edu.degree} • {edu.period}</p>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Primary CTA Link URL
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.cta_url || '#projects'}
+                      onChange={(e) => setProfileForm({ ...profileForm, cta_url: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <button
-                      onClick={() => {
-                        setEditingEdu(edu);
-                        setEduForm(edu);
-                        setEduModalOpen(true);
-                      }}
-                      className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-text-secondary"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => edu.id && handleDeleteEdu(edu.id)}
-                      className="p-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+
+                  {/* Secondary CTA */}
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Secondary CTA Text
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.secondary_cta_text || 'Contact Me'}
+                      onChange={(e) => setProfileForm({ ...profileForm, secondary_cta_text: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Secondary CTA Link URL
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.secondary_cta_url || '#contact'}
+                      onChange={(e) => setProfileForm({ ...profileForm, secondary_cta_url: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Availability / Status Text
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.availability || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, availability: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.location || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, location: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Tab: Asset Storage */}
-      {activeTab === 'upload' && (
-        <div className="glass-card p-6 sm:p-8 rounded-3xl border border-border max-w-xl space-y-6">
-          <h2 className="font-display font-bold text-lg text-text-primary">Storage Adapter & File Uploads</h2>
-          <p className="text-xs text-text-muted">
-            Upload images or PDF documents. Enforces 5MB size limit and safe MIME types. Automatically uses Cloudinary/S3 in cloud or local disk fallback.
-          </p>
-          <div className="border-2 border-dashed border-border rounded-2xl p-8 text-center">
-            <Upload className="w-8 h-8 text-primary mx-auto mb-3" />
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              accept="image/*,application/pdf"
-              className="text-xs text-text-secondary"
-            />
-            {uploading && <p className="text-xs text-primary mt-2">Uploading file to storage adapter...</p>}
-          </div>
+                <div className="pt-4 border-t border-border flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="px-6 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>Save Hero Changes</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
 
-          {uploadedUrl && (
-            <div className="p-4 rounded-xl bg-white/5 border border-border space-y-2">
-              <span className="text-xs font-mono text-emerald-400 block">Uploaded URL:</span>
-              <div className="flex items-center justify-between gap-2 bg-bg px-3 py-1.5 rounded-lg text-xs font-mono text-text-secondary">
-                <span className="truncate">{uploadedUrl}</span>
+          {/* 3. ABOUT CMS */}
+          {activeTab === 'about' && (
+            <form onSubmit={handleSaveProfile} className="space-y-6">
+              <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm space-y-6">
+                <div className="border-b border-border pb-4">
+                  <h3 className="font-display font-bold text-base text-text-primary">About Section & Engineering Highlights</h3>
+                  <p className="text-xs text-text-muted mt-0.5">Edit biographical text, sub-headings, and highlight pillars.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Section Heading
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.about_heading || 'About Me'}
+                      onChange={(e) => setProfileForm({ ...profileForm, about_heading: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Sub-Description
+                    </label>
+                    <input
+                      type="text"
+                      value={profileForm.about_description || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, about_description: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Full Bio
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={profileForm.bio || ''}
+                      onChange={(e) => setProfileForm({ ...profileForm, bio: e.target.value })}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      About Illustration / Image URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={profileForm.about_image || ''}
+                        onChange={(e) => setProfileForm({ ...profileForm, about_image: e.target.value })}
+                        placeholder="/images/about.jpg"
+                        className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openMediaPicker('Select About Image', (url) => setProfileForm({ ...profileForm, about_image: url }))}
+                        className="px-3 py-2 rounded-xl border border-border bg-bg-hover text-xs font-semibold hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                        <span>Choose</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-border flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingProfile}
+                    className="px-6 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {savingProfile ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>Save About Changes</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+
+          {/* 4. SKILLS CMS */}
+          {activeTab === 'skills' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Skills & Technologies</h3>
+                  <p className="text-xs text-text-muted">Manage technical competency categories, skill items, and tools.</p>
+                </div>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText(uploadedUrl);
-                    setCopiedUrl(true);
-                    setTimeout(() => setCopiedUrl(false), 2000);
+                    setEditingSkill(null);
+                    setSkillForm({ category: '', itemsStr: '' });
+                    setSkillModalOpen(true);
                   }}
-                  className="p-1 text-primary hover:text-white"
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
                 >
-                  {copiedUrl ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                  <Plus className="w-4 h-4" />
+                  <span>Add Skill Group</span>
                 </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {skills.map((s) => (
+                  <div key={s.id} className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="font-display font-bold text-sm text-text-primary">{s.category}</span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => {
+                              setEditingSkill(s);
+                              const itemsStr = s.items
+                                ? s.items.map((i: any) => typeof i === 'string' ? i : i.name).join(', ')
+                                : (s.chips || []).join(', ');
+                              setSkillForm({ category: s.category, itemsStr });
+                              setSkillModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Delete skill group '${s.category}'?`)) {
+                                await deleteSkill(s.id!);
+                                queryClient.invalidateQueries({ queryKey: ['skills'] });
+                                showToast('Skill group removed', 'info');
+                              }
+                            }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(s.items || s.chips || []).map((item: any, idx: number) => (
+                          <span key={idx} className="px-2.5 py-1 rounded-lg bg-bg-input border border-border text-xs font-mono text-text-secondary">
+                            {typeof item === 'string' ? item : item.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
-        </div>
-      )}
 
-      {/* Modals for Projects, Skills, Learning, Journey, Certifications, Achievements, Experience, Education */}
-      {projectModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingProject ? 'Edit Project' : 'New Project'}</h3>
-              <button onClick={() => setProjectModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
+          {/* 5. PROJECTS CMS */}
+          {activeTab === 'projects' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Projects CMS</h3>
+                  <p className="text-xs text-text-muted">Create, edit, duplicate, and publish project case studies.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Search projects..."
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      className="pl-9 pr-3 py-1.5 rounded-xl bg-bg-input border border-border text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <button
+                    onClick={() => {
+                      setEditingProject(null);
+                      setProjectForm({
+                        title: '', slug: '', summary: '', problem: '', solution: '',
+                        category: 'Full-Stack', image: '/images/hero.jpg', gallery: [],
+                        live: '', repo: '', tech: [], features: [], is_published: true
+                      });
+                      setProjectModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create Project</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Projects Table / Grid */}
+              <div className="space-y-3">
+                {projects
+                  .filter(p => !projectSearch || p.title.toLowerCase().includes(projectSearch.toLowerCase()) || p.category.toLowerCase().includes(projectSearch.toLowerCase()))
+                  .map((p) => (
+                    <div
+                      key={p.id}
+                      className="p-4 rounded-2xl bg-bg-card border border-border shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-primary/30 transition-all"
+                    >
+                      <div className="flex items-center gap-4 min-w-0">
+                        <img
+                          src={p.image || '/images/hero.jpg'}
+                          alt={p.title}
+                          className="w-16 h-12 rounded-xl object-cover border border-border shrink-0 bg-black/20"
+                          onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-display font-bold text-sm text-text-primary truncate">{p.title}</h4>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${p.is_published ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                              {p.is_published ? 'Published' : 'Draft'}
+                            </span>
+                            {p.featured && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-primary/10 text-primary">
+                                Featured
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-muted truncate mt-0.5 max-w-xl">{p.summary}</p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {p.tech?.slice(0, 4).map((t, idx) => (
+                              <span key={idx} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-bg-input text-text-secondary border border-border/50">
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                        {/* Toggle Publish */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await toggleProjectPublish(p.id!);
+                            queryClient.invalidateQueries({ queryKey: ['projects'] });
+                            showToast(`Project ${p.is_published ? 'unpublished' : 'published'}!`, 'info');
+                          }}
+                          className="p-2 rounded-xl border border-border text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+                          title={p.is_published ? 'Unpublish to Draft' : 'Publish to Live'}
+                        >
+                          {p.is_published ? <EyeOff className="w-3.5 h-3.5 text-amber-400" /> : <Eye className="w-3.5 h-3.5 text-emerald-400" />}
+                        </button>
+
+                        {/* Duplicate */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await duplicateProject(p.id!);
+                            queryClient.invalidateQueries({ queryKey: ['projects'] });
+                            showToast('Project duplicated as draft!', 'success');
+                          }}
+                          className="p-2 rounded-xl border border-border text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+                          title="Duplicate Project"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Edit */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingProject(p);
+                            setProjectForm(p);
+                            setProjectModalOpen(true);
+                          }}
+                          className="p-2 rounded-xl border border-border text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Edit Project"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Delete */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (confirm(`Delete project '${p.title}' permanently?`)) {
+                              await deleteProject(p.id!);
+                              queryClient.invalidateQueries({ queryKey: ['projects'] });
+                              showToast('Project deleted', 'info');
+                            }
+                          }}
+                          className="p-2 rounded-xl border border-border text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          title="Delete Project"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
             </div>
-            <form onSubmit={handleSaveProject} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={projectForm.title || ''}
-                  onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
+          )}
+
+          {/* 6. EDUCATION CMS */}
+          {activeTab === 'education' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Education Records</h3>
+                  <p className="text-xs text-text-muted">Manage academic background, degrees, CGPA, and institution logos.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingEdu(null);
+                    setEduForm({ school: '', degree: '', period: '', location: '', grade_cgpa: '', logo_url: '' });
+                    setEduModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Education</span>
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Slug</label>
-                <input
-                  type="text"
-                  required
-                  value={projectForm.slug || ''}
-                  onChange={(e) => setProjectForm({ ...projectForm, slug: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
+
+              <div className="space-y-3">
+                {education.map((ed) => (
+                  <div key={ed.id} className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm flex items-center justify-between">
+                    <div>
+                      <h4 className="font-display font-bold text-sm text-text-primary">{ed.school || ed.institution}</h4>
+                      <p className="text-xs text-text-secondary mt-0.5">{ed.degree} &bull; <span className="font-mono text-text-muted">{ed.period}</span></p>
+                      {ed.grade_cgpa && <p className="text-xs text-primary font-mono mt-1">CGPA / Grade: {ed.grade_cgpa}</p>}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => {
+                          setEditingEdu(ed);
+                          setEduForm(ed);
+                          setEduModalOpen(true);
+                        }}
+                        className="p-2 rounded-xl border border-border text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Delete education record '${ed.school}'?`)) {
+                            await deleteEducation(ed.id!);
+                            queryClient.invalidateQueries({ queryKey: ['education'] });
+                            showToast('Education record deleted', 'info');
+                          }
+                        }}
+                        className="p-2 rounded-xl border border-border text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Summary</label>
-                <textarea
-                  rows={2}
-                  required
-                  value={projectForm.summary || ''}
-                  onChange={(e) => setProjectForm({ ...projectForm, summary: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
+            </div>
+          )}
+
+          {/* 7. EXPERIENCE CMS */}
+          {activeTab === 'experience' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Experience & Roles</h3>
+                  <p className="text-xs text-text-muted">Manage roles, responsibilities, timeline, and company logos.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingExp(null);
+                    setExpForm({ company: '', title: '', location: '', period: '', pointsStr: '', techStr: '' });
+                    setExpModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Experience</span>
+                </button>
               </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Problem Statement</label>
-                <textarea
-                  rows={2}
-                  value={projectForm.problem || ''}
-                  onChange={(e) => setProjectForm({ ...projectForm, problem: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
+
+              <div className="space-y-3">
+                {experience.map((exp) => (
+                  <div key={exp.id} className="p-5 rounded-2xl bg-bg-card border border-border shadow-sm flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-display font-bold text-sm text-text-primary">{exp.title}</h4>
+                        <span className="text-xs text-text-muted font-normal">at {exp.company}</span>
+                      </div>
+                      <p className="text-xs font-mono text-text-muted mt-0.5">{exp.period}</p>
+                      <ul className="mt-2 space-y-1 text-xs text-text-secondary list-disc list-inside">
+                        {(exp.points || []).map((pt, idx) => (
+                          <li key={idx} className="truncate max-w-xl">{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => {
+                          setEditingExp(exp);
+                          setExpForm({
+                            ...exp,
+                            pointsStr: (exp.points || []).join('\n'),
+                            techStr: (exp.technologies || []).join(', ')
+                          });
+                          setExpModalOpen(true);
+                        }}
+                        className="p-2 rounded-xl border border-border text-text-muted hover:text-primary hover:bg-primary/10 transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Delete experience '${exp.title}'?`)) {
+                            await deleteExperience(exp.id!);
+                            queryClient.invalidateQueries({ queryKey: ['experience'] });
+                            showToast('Experience record deleted', 'info');
+                          }
+                        }}
+                        className="p-2 rounded-xl border border-border text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Solution Architecture</label>
-                <textarea
-                  rows={2}
-                  value={projectForm.solution || ''}
-                  onChange={(e) => setProjectForm({ ...projectForm, solution: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
+            </div>
+          )}
+
+          {/* 8. RESUME MANAGEMENT */}
+          {activeTab === 'resume' && (
+            <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm space-y-6">
+              <div className="border-b border-border pb-4">
+                <h3 className="font-display font-bold text-base text-text-primary">Resume Document Management</h3>
+                <p className="text-xs text-text-muted mt-0.5">Upload, replace, and verify your official resume PDF.</p>
               </div>
+
+              <div className="p-6 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+                  <FileText className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="font-display font-bold text-sm text-text-primary">Current Active Resume</h4>
+                  <p className="text-xs font-mono text-text-muted mt-0.5">
+                    {siteSettings?.resume_url || profile?.resume_url || '/resume.pdf'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 pt-2">
+                  <a
+                    href={siteSettings?.resume_url || profile?.resume_url || '/resume.pdf'}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2 rounded-xl border border-border text-xs font-semibold text-text-secondary hover:bg-bg-hover transition-colors flex items-center gap-1.5"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-primary" />
+                    <span>Preview Current PDF</span>
+                  </a>
+                  <label className="cursor-pointer px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md">
+                    {resumeUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    <span>Upload New Resume (PDF)</span>
+                    <input
+                      type="file"
+                      accept="application/pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleResumeFileUpload(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 9. MEDIA LIBRARY CMS */}
+          {activeTab === 'media' && (
+            <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm space-y-6">
+              <div className="flex items-center justify-between border-b border-border pb-4">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Media Library</h3>
+                  <p className="text-xs text-text-muted mt-0.5">Persistent cloud and local media assets repository.</p>
+                </div>
+                <button
+                  onClick={() => openMediaPicker('Upload / Manage Media', () => {})}
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Open Media Browser & Uploader</span>
+                </button>
+              </div>
+
+              <div className="p-8 rounded-2xl border border-dashed border-border text-center space-y-3">
+                <ImageIcon className="w-12 h-12 text-primary/40 mx-auto" />
+                <h4 className="font-display font-bold text-sm text-text-primary">Visual Media Asset Manager</h4>
+                <p className="text-xs text-text-muted max-w-md mx-auto">
+                  Click the button above to upload new images directly from your computer, inspect dimensions and filesizes, and pick images for projects or hero sections with zero downtime.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* 10. SOCIAL LINKS CMS */}
+          {activeTab === 'socials' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Social & Professional Links</h3>
+                  <p className="text-xs text-text-muted">Manage GitHub, LinkedIn, LeetCode, Email, and custom external profiles.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditingSocial(null);
+                    setSocialForm({ platform: '', url: '', icon: 'globe', order: 0, is_active: true });
+                    setSocialModalOpen(true);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5 shadow-md"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Social Link</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {socialLinks.map((sl) => (
+                  <div key={sl.id} className="p-4 rounded-2xl bg-bg-card border border-border shadow-sm flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-display font-bold text-sm text-text-primary">{sl.platform}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${sl.is_active ? 'bg-emerald-500/10 text-emerald-400' : 'bg-zinc-500/10 text-zinc-400'}`}>
+                          {sl.is_active ? 'Active' : 'Disabled'}
+                        </span>
+                      </div>
+                      <a href={sl.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary truncate hover:underline mt-0.5 block max-w-xs">
+                        {sl.url}
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setEditingSocial(sl);
+                          setSocialForm(sl);
+                          setSocialModalOpen(true);
+                        }}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm(`Delete social link '${sl.platform}'?`)) {
+                            await deleteSocialLink(sl.id!);
+                            queryClient.invalidateQueries({ queryKey: ['social-links'] });
+                            showToast('Social link deleted', 'info');
+                          }
+                        }}
+                        className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 11. INQUIRIES CMS */}
+          {activeTab === 'messages' && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-display font-bold text-base text-text-primary">Contact Messages & Inquiries</h3>
+                  <p className="text-xs text-text-muted">Review, filter, and respond to incoming recruiter messages.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
+                    <input
+                      type="text"
+                      placeholder="Search messages..."
+                      value={messageSearch}
+                      onChange={(e) => setMessageSearch(e.target.value)}
+                      className="pl-9 pr-3 py-1.5 rounded-xl bg-bg-input border border-border text-xs text-text-primary focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  <select
+                    value={messageFilter}
+                    onChange={(e) => setMessageFilter(e.target.value as any)}
+                    className="px-3 py-1.5 rounded-xl bg-bg-input border border-border text-xs text-text-primary focus:outline-none focus:border-primary"
+                  >
+                    <option value="all">All Status</option>
+                    <option value="unread">Unhandled</option>
+                    <option value="read">Handled</option>
+                  </select>
+                </div>
+              </div>
+
+              {loadingMessages ? (
+                <div className="flex items-center justify-center py-16 text-text-muted gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Loading inquiries...</span>
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="p-8 rounded-2xl bg-bg-card border border-border text-center text-text-muted">
+                  No inquiries received yet.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {messages
+                    .filter((m) => {
+                      if (messageFilter === 'unread') return !m.is_handled;
+                      if (messageFilter === 'read') return m.is_handled;
+                      return true;
+                    })
+                    .filter((m) => {
+                      if (!messageSearch) return true;
+                      const q = messageSearch.toLowerCase();
+                      return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.subject.toLowerCase().includes(q) || m.message.toLowerCase().includes(q);
+                    })
+                    .map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`p-5 rounded-2xl border transition-all ${
+                          msg.is_handled
+                            ? 'bg-bg-card border-border opacity-80'
+                            : 'bg-primary/5 border-primary/30 shadow-sm'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-display font-bold text-sm text-text-primary">{msg.name}</span>
+                            <span className="text-xs font-mono text-text-muted">&lt;{msg.email}&gt;</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono text-text-muted">{new Date(msg.created_at).toLocaleDateString()}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${msg.is_handled ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
+                              {msg.is_handled ? 'Handled' : 'New'}
+                            </span>
+                          </div>
+                        </div>
+                        <h5 className="text-xs font-bold text-text-primary mb-1">{msg.subject}</h5>
+                        <p className="text-xs text-text-secondary leading-relaxed bg-bg-input/40 p-3 rounded-xl border border-border/40 whitespace-pre-wrap">
+                          {msg.message}
+                        </p>
+                        <div className="flex items-center justify-end gap-2 mt-3 pt-2 border-t border-border/40">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await toggleMessageHandled(msg.id);
+                              loadMessages();
+                              showToast('Inquiry status updated', 'info');
+                            }}
+                            className="px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-text-secondary hover:bg-bg-hover transition-colors"
+                          >
+                            {msg.is_handled ? 'Mark Unhandled' : 'Mark as Handled'}
+                          </button>
+                          <a
+                            href={`mailto:${msg.email}?subject=Re: ${encodeURIComponent(msg.subject)}`}
+                            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-hover transition-colors flex items-center gap-1.5"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>Reply via Email</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm('Delete this inquiry?')) {
+                                await deleteContactMessage(msg.id);
+                                loadMessages();
+                                showToast('Inquiry deleted', 'info');
+                              }
+                            }}
+                            className="p-1.5 rounded-lg text-text-muted hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 12. WEBSITE SETTINGS CMS */}
+          {activeTab === 'settings' && (
+            <form onSubmit={handleSaveSettings} className="space-y-6">
+              <div className="p-6 rounded-2xl bg-bg-card border border-border shadow-sm space-y-6">
+                <div className="border-b border-border pb-4">
+                  <h3 className="font-display font-bold text-base text-text-primary">Website & Global SEO Settings</h3>
+                  <p className="text-xs text-text-muted mt-0.5">Configure site metadata, contact email, Open Graph image, and footer text.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Site Title
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.site_title || 'JDLN Portfolio'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, site_title: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Primary Contact Email
+                    </label>
+                    <input
+                      type="email"
+                      value={settingsForm.contact_email || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, contact_email: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      SEO Meta Title
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.seo_title || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, seo_title: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      SEO Meta Description
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={settingsForm.seo_description || ''}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, seo_description: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Open Graph (Social Share) Image URL
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={settingsForm.og_image_url || ''}
+                        onChange={(e) => setSettingsForm({ ...settingsForm, og_image_url: e.target.value })}
+                        className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => openMediaPicker('Select Open Graph Image', (url) => setSettingsForm({ ...settingsForm, og_image_url: url }))}
+                        className="px-3 py-2 rounded-xl border border-border bg-bg-hover text-xs font-semibold hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1.5"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                        <span>Choose</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Favicon URL
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.favicon_url || '/favicon.svg'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, favicon_url: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                      Footer Copyright Text
+                    </label>
+                    <input
+                      type="text"
+                      value={settingsForm.footer_text || 'Engineered with precision. All rights reserved.'}
+                      onChange={(e) => setSettingsForm({ ...settingsForm, footer_text: e.target.value })}
+                      className="w-full px-3.5 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-border flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={savingSettings}
+                    className="px-6 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary-hover shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                    <span>Save Settings Changes</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
+      </main>
+
+      {/* PROJECT CREATE / EDIT MODAL */}
+      {projectModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-bg-card border border-border w-full max-w-3xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border bg-bg-card/50">
+              <h3 className="font-display font-bold text-lg text-text-primary">
+                {editingProject ? 'Edit Project' : 'Create New Project'}
+              </h3>
               <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
+                onClick={() => setProjectModalOpen(false)}
+                className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-bg-hover transition-colors"
               >
-                Save Project
+                <X className="w-5 h-5" />
               </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try {
+                  if (editingProject && editingProject.id) {
+                    await updateProject(editingProject.id, projectForm);
+                    showToast('Project updated successfully!', 'success');
+                  } else {
+                    await createProject(projectForm);
+                    showToast('Project created successfully!', 'success');
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['projects'] });
+                  setProjectModalOpen(false);
+                } catch (err: any) {
+                  showToast(err.message || 'Failed to save project', 'error');
+                }
+              }}
+              className="p-6 overflow-y-auto space-y-4 flex-1"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Project Title *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={projectForm.title || ''}
+                    onChange={(e) => {
+                      const title = e.target.value;
+                      const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+                      setProjectForm({ ...projectForm, title, slug: projectForm.slug || slug });
+                    }}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Slug (URL identifier) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={projectForm.slug || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, slug: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Category *
+                  </label>
+                  <select
+                    value={projectForm.category || 'Full-Stack'}
+                    onChange={(e) => setProjectForm({ ...projectForm, category: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  >
+                    <option value="Full-Stack">Full-Stack</option>
+                    <option value="Full-Stack + AI">Full-Stack + AI</option>
+                    <option value="Mobile + Backend">Mobile + Backend</option>
+                    <option value="AI / Systems">AI / Systems</option>
+                    <option value="DevOps">DevOps</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Main Showcase Image URL *
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      required
+                      value={projectForm.image || ''}
+                      onChange={(e) => setProjectForm({ ...projectForm, image: e.target.value })}
+                      className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => openMediaPicker('Select Project Showcase Image', (url) => setProjectForm({ ...projectForm, image: url }))}
+                      className="px-3 py-2 rounded-xl border border-border bg-bg-hover text-xs font-semibold hover:bg-bg-input transition-colors shrink-0 flex items-center gap-1"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                      <span>Choose</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Short Summary (Hero Card) *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={projectForm.summary || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, summary: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Problem Statement *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={projectForm.problem || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, problem: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Engineered Solution *
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={projectForm.solution || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, solution: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Technologies (comma-separated) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={Array.isArray(projectForm.tech) ? projectForm.tech.join(', ') : ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, tech: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                    placeholder="React 19, FastAPI, PostgreSQL, PyTorch"
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Key Features (comma-separated) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={Array.isArray(projectForm.features) ? projectForm.features.join(', ') : ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, features: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                    placeholder="Auth with JWT, Offline-first sync"
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    Live Demo URL
+                  </label>
+                  <input
+                    type="url"
+                    value={projectForm.live || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, live: e.target.value })}
+                    placeholder="https://my-app.vercel.app"
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
+                    GitHub Repo URL
+                  </label>
+                  <input
+                    type="url"
+                    value={projectForm.repo || ''}
+                    onChange={(e) => setProjectForm({ ...projectForm, repo: e.target.value })}
+                    placeholder="https://github.com/..."
+                    className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex items-center gap-6 sm:col-span-2 pt-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text-primary">
+                    <input
+                      type="checkbox"
+                      checked={projectForm.featured ?? false}
+                      onChange={(e) => setProjectForm({ ...projectForm, featured: e.target.checked })}
+                      className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                    />
+                    <span>Featured Project</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-text-primary">
+                    <input
+                      type="checkbox"
+                      checked={projectForm.is_published ?? true}
+                      onChange={(e) => setProjectForm({ ...projectForm, is_published: e.target.checked })}
+                      className="rounded border-border text-primary focus:ring-primary w-4 h-4"
+                    />
+                    <span>Published (Visible on site)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-border flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProjectModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-border text-text-secondary hover:bg-bg-hover text-sm font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary-hover shadow-md transition-colors flex items-center gap-1.5"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>{editingProject ? 'Update Project' : 'Create Project'}</span>
+                </button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
+      {/* SKILL MODAL */}
       {skillModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingSkill ? 'Edit Skill Group' : 'New Skill Group'}</h3>
-              <button onClick={() => setSkillModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
-            </div>
-            <form onSubmit={handleSaveSkill} className="space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-card border border-border w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+            <h3 className="font-display font-bold text-base text-text-primary">
+              {editingSkill ? 'Edit Skill Group' : 'Add Skill Group'}
+            </h3>
+            <div className="space-y-3">
               <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Category Name</label>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Category Name</label>
                 <input
                   type="text"
-                  required
                   value={skillForm.category}
                   onChange={(e) => setSkillForm({ ...skillForm, category: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
+                  placeholder="e.g. Backend, Frontend, Cloud"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Skills (Comma-separated)</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="React, TypeScript, FastAPI"
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Skills (comma-separated)</label>
+                <textarea
+                  rows={3}
                   value={skillForm.itemsStr}
                   onChange={(e) => setSkillForm({ ...skillForm, itemsStr: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
+                  placeholder="Java, Python, FastAPI, Docker"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
-              >
-                Save Skill Group
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {learningModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingLearning ? 'Edit Learning Goal' : 'New Learning Goal'}</h3>
-              <button onClick={() => setLearningModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
             </div>
-            <form onSubmit={handleSaveLearning} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Goal / Topic Name</label>
-                <input
-                  type="text"
-                  required
-                  value={learningForm.name || ''}
-                  onChange={(e) => setLearningForm({ ...learningForm, name: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Category</label>
-                <input
-                  type="text"
-                  value={learningForm.category || ''}
-                  onChange={(e) => setLearningForm({ ...learningForm, category: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Status</label>
-                <input
-                  type="text"
-                  value={learningForm.status || ''}
-                  onChange={(e) => setLearningForm({ ...learningForm, status: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
               <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
+                type="button"
+                onClick={() => setSkillModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-border text-xs font-medium text-text-secondary hover:bg-bg-hover"
               >
-                Save Learning Goal
+                Cancel
               </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {journeyModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingJourney ? 'Edit Milestone' : 'New Milestone'}</h3>
-              <button onClick={() => setJourneyModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const items = skillForm.itemsStr.split(',').map(s => s.trim()).filter(Boolean).map(name => ({ name, level: 'Intermediate' }));
+                  if (editingSkill && editingSkill.id) {
+                    await updateSkill(editingSkill.id, { category: skillForm.category, items });
+                    showToast('Skill group updated', 'success');
+                  } else {
+                    await createSkill({ category: skillForm.category, items });
+                    showToast('Skill group created', 'success');
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['skills'] });
+                  setSkillModalOpen(false);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
+              >
+                Save
+              </button>
             </div>
-            <form onSubmit={handleSaveJourney} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Year</label>
-                <input
-                  type="text"
-                  required
-                  value={journeyForm.year || ''}
-                  onChange={(e) => setJourneyForm({ ...journeyForm, year: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={journeyForm.title || ''}
-                  onChange={(e) => setJourneyForm({ ...journeyForm, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Tag</label>
-                <input
-                  type="text"
-                  value={journeyForm.tag || ''}
-                  onChange={(e) => setJourneyForm({ ...journeyForm, tag: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Description</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={journeyForm.description || ''}
-                  onChange={(e) => setJourneyForm({ ...journeyForm, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
-              >
-                Save Milestone
-              </button>
-            </form>
           </div>
         </div>
       )}
 
-      {certModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingCert ? 'Edit Certification' : 'New Certification'}</h3>
-              <button onClick={() => setCertModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
-            </div>
-            <form onSubmit={handleSaveCert} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={certForm.title || ''}
-                  onChange={(e) => setCertForm({ ...certForm, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Issuer</label>
-                <input
-                  type="text"
-                  required
-                  value={certForm.issuer || ''}
-                  onChange={(e) => setCertForm({ ...certForm, issuer: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Date</label>
-                <input
-                  type="text"
-                  required
-                  value={certForm.date || ''}
-                  onChange={(e) => setCertForm({ ...certForm, date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Credential URL</label>
-                <input
-                  type="url"
-                  value={certForm.credential_url || ''}
-                  onChange={(e) => setCertForm({ ...certForm, credential_url: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
-              >
-                Save Certification
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {achieveModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingAchieve ? 'Edit Achievement' : 'New Achievement'}</h3>
-              <button onClick={() => setAchieveModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
-            </div>
-            <form onSubmit={handleSaveAchieve} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Title</label>
-                <input
-                  type="text"
-                  required
-                  value={achieveForm.title || ''}
-                  onChange={(e) => setAchieveForm({ ...achieveForm, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Organization</label>
-                <input
-                  type="text"
-                  required
-                  value={achieveForm.organization || ''}
-                  onChange={(e) => setAchieveForm({ ...achieveForm, organization: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Date</label>
-                <input
-                  type="text"
-                  required
-                  value={achieveForm.date || ''}
-                  onChange={(e) => setAchieveForm({ ...achieveForm, date: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Badge / Placement</label>
-                <input
-                  type="text"
-                  value={achieveForm.badge || ''}
-                  onChange={(e) => setAchieveForm({ ...achieveForm, badge: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Description</label>
-                <textarea
-                  rows={2}
-                  required
-                  value={achieveForm.description || ''}
-                  onChange={(e) => setAchieveForm({ ...achieveForm, description: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
-              >
-                Save Achievement
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {expModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingExp ? 'Edit Experience' : 'New Experience'}</h3>
-              <button onClick={() => setExpModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
-            </div>
-            <form onSubmit={handleSaveExp} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Company / Organization</label>
-                <input
-                  type="text"
-                  required
-                  value={expForm.company}
-                  onChange={(e) => setExpForm({ ...expForm, company: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Role Title</label>
-                <input
-                  type="text"
-                  required
-                  value={expForm.title}
-                  onChange={(e) => setExpForm({ ...expForm, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Period (e.g. Jan 2026 - Present)</label>
-                <input
-                  type="text"
-                  required
-                  value={expForm.period}
-                  onChange={(e) => setExpForm({ ...expForm, period: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Bullet Points (One per line)</label>
-                <textarea
-                  rows={3}
-                  required
-                  value={expForm.pointsStr}
-                  onChange={(e) => setExpForm({ ...expForm, pointsStr: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
-                />
-              </div>
-              <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
-              >
-                Save Experience
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
+      {/* EDUCATION MODAL */}
       {eduModalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div className="glass-card p-6 rounded-3xl border border-border max-w-md w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-base text-text-primary">{editingEdu ? 'Edit Education' : 'New Education'}</h3>
-              <button onClick={() => setEduModalOpen(false)}><X className="w-5 h-5 text-text-muted" /></button>
-            </div>
-            <form onSubmit={handleSaveEdu} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Institution / School</label>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-card border border-border w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl">
+            <h3 className="font-display font-bold text-base text-text-primary">
+              {editingEdu ? 'Edit Education' : 'Add Education Record'}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Institution / School *</label>
                 <input
                   type="text"
                   required
                   value={eduForm.school || ''}
-                  onChange={(e) => setEduForm({ ...eduForm, school: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
+                  onChange={(e) => setEduForm({ ...eduForm, school: e.target.value, institution: e.target.value })}
+                  placeholder="GITAM Deemed to be University"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
                 />
               </div>
-              <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Degree & CGPA</label>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Degree / Course *</label>
                 <input
                   type="text"
                   required
                   value={eduForm.degree || ''}
                   onChange={(e) => setEduForm({ ...eduForm, degree: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
+                  placeholder="B.Tech in Computer Science and Engineering"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
                 />
               </div>
               <div>
-                <label className="text-xs font-mono uppercase text-text-muted">Period (e.g. 2023 - 2027)</label>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Timeline / Period *</label>
                 <input
                   type="text"
                   required
                   value={eduForm.period || ''}
                   onChange={(e) => setEduForm({ ...eduForm, period: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-bg-surface border border-border text-sm"
+                  placeholder="2024 - 2028 (Expected)"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
                 />
               </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">CGPA / Percentage</label>
+                <input
+                  type="text"
+                  value={eduForm.grade_cgpa || ''}
+                  onChange={(e) => setEduForm({ ...eduForm, grade_cgpa: e.target.value })}
+                  placeholder="8.17 / 10"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
               <button
-                type="submit"
-                className="w-full py-2.5 rounded-xl font-semibold text-xs uppercase tracking-wider text-white bg-primary hover:bg-primary-hover"
+                type="button"
+                onClick={() => setEduModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-border text-xs font-medium text-text-secondary hover:bg-bg-hover"
               >
-                Save Education
+                Cancel
               </button>
-            </form>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (editingEdu && editingEdu.id) {
+                    await updateEducation(editingEdu.id, eduForm);
+                    showToast('Education record updated', 'success');
+                  } else {
+                    await createEducation(eduForm);
+                    showToast('Education record created', 'success');
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['education'] });
+                  setEduModalOpen(false);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       )}
+
+      {/* EXPERIENCE MODAL */}
+      {expModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-card border border-border w-full max-w-lg rounded-2xl p-6 space-y-4 shadow-2xl">
+            <h3 className="font-display font-bold text-base text-text-primary">
+              {editingExp ? 'Edit Experience' : 'Add Experience Record'}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Company / Organization *</label>
+                <input
+                  type="text"
+                  required
+                  value={expForm.company || ''}
+                  onChange={(e) => setExpForm({ ...expForm, company: e.target.value })}
+                  placeholder="GITAM / Organization"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Role Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={expForm.title || ''}
+                  onChange={(e) => setExpForm({ ...expForm, title: e.target.value })}
+                  placeholder="Full-Stack Developer"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Period *</label>
+                <input
+                  type="text"
+                  required
+                  value={expForm.period || ''}
+                  onChange={(e) => setExpForm({ ...expForm, period: e.target.value })}
+                  placeholder="2024 - Present"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Responsibilities / Bullet Points (one per line) *</label>
+                <textarea
+                  rows={4}
+                  required
+                  value={expForm.pointsStr || ''}
+                  onChange={(e) => setExpForm({ ...expForm, pointsStr: e.target.value })}
+                  placeholder="Engineered high-performance REST APIs with FastAPI..."
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none leading-relaxed"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setExpModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-border text-xs font-medium text-text-secondary hover:bg-bg-hover"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const points = expForm.pointsStr ? expForm.pointsStr.split('\n').map(s => s.trim()).filter(Boolean) : [];
+                  const payload = { ...expForm, points };
+                  delete (payload as any).pointsStr;
+                  delete (payload as any).techStr;
+
+                  if (editingExp && editingExp.id) {
+                    await updateExperience(editingExp.id, payload);
+                    showToast('Experience record updated', 'success');
+                  } else {
+                    await createExperience(payload);
+                    showToast('Experience record created', 'success');
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['experience'] });
+                  setExpModalOpen(false);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SOCIAL LINK MODAL */}
+      {socialModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-bg-card border border-border w-full max-w-md rounded-2xl p-6 space-y-4 shadow-2xl">
+            <h3 className="font-display font-bold text-base text-text-primary">
+              {editingSocial ? 'Edit Social Link' : 'Add Social Link'}
+            </h3>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Platform Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={socialForm.platform || ''}
+                  onChange={(e) => setSocialForm({ ...socialForm, platform: e.target.value })}
+                  placeholder="LeetCode, GitHub, LinkedIn, Twitter"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Profile URL *</label>
+                <input
+                  type="url"
+                  required
+                  value={socialForm.url || ''}
+                  onChange={(e) => setSocialForm({ ...socialForm, url: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-mono uppercase text-text-secondary mb-1">Icon Key</label>
+                <input
+                  type="text"
+                  value={socialForm.icon || 'globe'}
+                  onChange={(e) => setSocialForm({ ...socialForm, icon: e.target.value })}
+                  placeholder="github, linkedin, leetcode, mail, globe"
+                  className="w-full px-3 py-2 rounded-xl bg-bg-input border border-border text-sm text-text-primary focus:border-primary focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setSocialModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl border border-border text-xs font-medium text-text-secondary hover:bg-bg-hover"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (editingSocial && editingSocial.id) {
+                    await updateSocialLink(editingSocial.id, socialForm);
+                    showToast('Social link updated', 'success');
+                  } else {
+                    await createSocialLink(socialForm);
+                    showToast('Social link created', 'success');
+                  }
+                  queryClient.invalidateQueries({ queryKey: ['social-links'] });
+                  setSocialModalOpen(false);
+                }}
+                className="px-4 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary-hover"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* REUSABLE MEDIA PICKER MODAL */}
+      <MediaPickerModal
+        isOpen={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(url) => {
+          onMediaSelectedCallback(url);
+          showToast('Media selected successfully!', 'success');
+        }}
+        title={mediaPickerTitle}
+      />
     </div>
   );
 };

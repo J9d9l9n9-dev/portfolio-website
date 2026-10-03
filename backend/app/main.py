@@ -9,7 +9,7 @@ from app.database import engine, Base
 from app.seed import seed_database
 from app.routers import (
     auth, profile, projects, skills, experience, education,
-    contact, upload, journey, certifications, achievements, settings as settings_router
+    contact, upload, media, social_links, journey, certifications, achievements, settings as settings_router
 )
 
 # Initialize database schema
@@ -75,6 +75,8 @@ app.include_router(education.router, prefix=api_v1)
 app.include_router(achievements.router, prefix=api_v1)
 app.include_router(contact.router, prefix=api_v1)
 app.include_router(upload.router, prefix=api_v1)
+app.include_router(media.router, prefix=api_v1)
+app.include_router(social_links.router, prefix=api_v1)
 app.include_router(settings_router.router, prefix=api_v1)
 
 @app.get("/", tags=["Health"])
